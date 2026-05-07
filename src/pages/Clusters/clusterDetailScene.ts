@@ -1,5 +1,5 @@
 import { full, item, pageScene, row } from '../../scenes/common';
-import { linkedTablePanel, tablePanel, textPanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
+import { linkedTablePanel, tablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
 import { alertCountQuery, alertInventoryQuery } from '../../queries/alerts';
 import { namespaceInventoryQuery, nodeInventoryQuery, podInventoryQuery, workloadInventoryQuery } from '../../queries/entity';
 import {
@@ -34,12 +34,5 @@ export function clusterDetailScene(cluster: string) {
     full(linkedTablePanel('Pods in cluster', podInventoryQuery(scope), [podLink()]), 320),
     full(linkedTablePanel('Nodes in cluster', nodeInventoryQuery(scope), [nodeLink()]), 320),
     full(tablePanel('Cluster alerts', alertInventoryQuery(scope)), 300),
-    full(
-      textPanel(
-        'Next tabs',
-        'CPU, Memory, Storage, Network, Control Plane, Operators, Logs/Events, and Alerts will be split into dedicated tab scenes after the MVP query parity pass.'
-      ),
-      160
-    ),
   ]);
 }
