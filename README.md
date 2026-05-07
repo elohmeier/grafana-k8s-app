@@ -50,5 +50,17 @@ docker run --rm -p 3010:3000 \
   -e GF_AUTH_ANONYMOUS_ORG_ROLE=Admin \
   -v "$PWD/kubernetes-observability-app:/var/lib/grafana/plugins/kubernetes-observability-app:ro" \
   -v "$PWD/provisioning:/etc/grafana/provisioning:ro" \
+  -v "$PWD/grafana.ini:/etc/grafana/grafana.ini:ro" \
   grafana/grafana-enterprise:12.3.2
 ```
+
+## Sidebar placement
+
+By default Grafana hides app plugins under **More apps**. The repo ships a `grafana.ini` that promotes this plugin into the top-level **Observability** sidebar group via:
+
+```ini
+[navigation.app_sections]
+kubernetes-observability-app = observability 10
+```
+
+The compose file and the `docker run` example above mount this file into `/etc/grafana/grafana.ini`. For your own Grafana deployment, merge the snippet into your existing config (or set the equivalent in your config-management tooling). Use `root` instead of `observability` to pin it at the very top of the sidebar; adjust the trailing number to change sort weight. Restart Grafana after changes.

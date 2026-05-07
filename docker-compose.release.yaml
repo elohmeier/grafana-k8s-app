@@ -12,6 +12,12 @@ services:
         target: /etc/grafana/provisioning
         bind:
           create_host_path: false
+      - type: bind
+        source: ./grafana.ini
+        target: /etc/grafana/grafana.ini
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       GF_LOG_FILTERS: plugin.kubernetes-observability-app:debug
       GF_LOG_LEVEL: info
