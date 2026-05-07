@@ -1,4 +1,5 @@
 import { alertInventoryQuery } from './alerts';
+import { clusterInventoryQuery } from './entity';
 import { namespaceInfrastructureQuery, namespaceOwnershipQuery } from './infra';
 import { kubernetesEventsQuery, kubernetesLogsQuery, kubernetesWarningsAndErrorsQuery } from './logs';
 import { networkErrors, networkReceive, networkReceivePackets, networkTransmit } from './network';
@@ -123,6 +124,21 @@ describe('resource query builders', () => {
     expect(capacityQuery).toContain('on (cluster) group_left()');
     expect(p95Query).toContain('quantile_over_time(0.95');
     expect(topQuery).toContain('topk(10');
+  });
+});
+
+describe('entity query builders', () => {
+  it('builds cluster inventory as one cluster summary row with node count value', () => {
+    const query = compact(clusterInventoryQuery());
+
+    expect(query).toContain('count by (cluster, provider_id)');
+    expect(query).toContain('max by (cluster, node, provider_id)');
+    expect(query).toContain('label_replace');
+    expect(query).toContain('or on (cluster)');
+    expect(query).toContain('count by (cluster)');
+    expect(query).not.toContain('kubelet_version');
+    expect(query).not.toContain('container_runtime_version');
+    expect(query).not.toContain('os_image');
   });
 });
 

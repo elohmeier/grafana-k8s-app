@@ -1,5 +1,5 @@
 import { DataLink, FieldColorModeId, ThresholdsMode } from '@grafana/data';
-import { PanelBuilders, SceneQueryRunner } from '@grafana/scenes';
+import { PanelBuilders, SceneDataTransformer, SceneQueryRunner } from '@grafana/scenes';
 import { DataSourceRef } from '@grafana/schema';
 import { elasticsearchDatasource, infraDatasource, prometheusDatasource } from '../queries/datasources';
 
@@ -28,6 +28,22 @@ export function promRunner(expr: string, refId = 'A', options: PromRunnerOptions
     ],
     maxDataPoints: 800,
     minInterval: '30s',
+  });
+}
+
+export function prometheusTableData(expr: string) {
+  return new SceneDataTransformer({
+    $data: promRunner(expr, 'A', { format: 'table', instant: true, legendFormat: '', timeRangeCompare: false }),
+    transformations: [
+      {
+        id: 'organize',
+        options: {
+          excludeByName: {
+            Time: true,
+          },
+        },
+      },
+    ],
   });
 }
 
@@ -86,16 +102,18 @@ export function statPanel(title: string, expr: string) {
 export function tablePanel(title: string, expr: string) {
   return PanelBuilders.table()
     .setTitle(title)
-    .setData(promRunner(expr, 'A', { format: 'table', instant: true, legendFormat: '', timeRangeCompare: false }))
+    .setData(prometheusTableData(expr))
     .setNoValue('-')
+    .setFilterable(true)
     .build();
 }
 
 export function linkedTablePanel(title: string, expr: string, links: DataLink[]) {
   return PanelBuilders.table()
     .setTitle(title)
-    .setData(promRunner(expr, 'A', { format: 'table', instant: true, legendFormat: '', timeRangeCompare: false }))
+    .setData(prometheusTableData(expr))
     .setNoValue('-')
+    .setFilterable(true)
     .setLinks(links)
     .build();
 }

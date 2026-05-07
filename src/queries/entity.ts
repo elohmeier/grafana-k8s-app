@@ -2,10 +2,24 @@ import { CLUSTER_FILTER, NAMESPACE_FILTER, normalizedClassicOrOtel, normalizedOt
 import { EntityScope, scopedMatchers } from './prometheus';
 
 export function clusterInventoryQuery() {
-  const classic = `max by (cluster, node, provider_id, kubelet_version, container_runtime_version, os_image) (kube_node_info{cluster=~"${CLUSTER_FILTER}", node!=""})`;
-  const otel = `max by (cluster, node) (${normalizedOtelKubeMetric('k8s_node_info')})`;
+  const classic = `count by (cluster, provider_id) (
+  max by (cluster, node, provider_id) (
+    label_replace(
+      kube_node_info{cluster=~"${CLUSTER_FILTER}", node!=""},
+      "provider_id",
+      "$1",
+      "provider_id",
+      "([^:]+)://.*"
+    )
+  )
+)`;
+  const otel = `count by (cluster) (
+  max by (cluster, node) (
+    ${normalizedOtelKubeMetric('k8s_node_info')}
+  )
+)`;
 
-  return normalizedClassicOrOtel(classic, otel);
+  return `(${classic}) or on (cluster) (${otel})`;
 }
 
 export function namespaceInventoryQuery(scope: EntityScope = {}) {

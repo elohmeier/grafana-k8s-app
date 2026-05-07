@@ -1,11 +1,14 @@
-import { SceneQueryRunner } from '@grafana/scenes';
+import { SceneDataTransformer, SceneQueryRunner } from '@grafana/scenes';
 
 import { nodeMemoryUtilization } from '../queries/node';
 import { clusterCpuUsage, nodeConditions } from '../queries/prometheus';
-import { legendFromPromQuery, linkedTablePanel, tablePanel, timeseriesPanel } from './panels';
+import { legendFromPromQuery, linkedTablePanel, prometheusTableData, tablePanel, timeseriesPanel } from './panels';
 
 function panelQuery(panel: ReturnType<typeof tablePanel>) {
-  return ((panel.state.$data as SceneQueryRunner).state.queries[0] ?? {}) as Record<string, unknown>;
+  const data = panel.state.$data;
+  const runner = data instanceof SceneDataTransformer ? data.state.$data : data;
+
+  return ((runner as SceneQueryRunner).state.queries[0] ?? {}) as Record<string, unknown>;
 }
 
 describe('panel query construction', () => {
@@ -25,6 +28,19 @@ describe('panel query construction', () => {
       format: 'table',
       instant: true,
       legendFormat: '',
+    });
+  });
+
+  it('hides the Prometheus timestamp field from generated table panels', () => {
+    const data = prometheusTableData(nodeConditions()) as SceneDataTransformer;
+
+    expect(data.state.transformations).toContainEqual({
+      id: 'organize',
+      options: {
+        excludeByName: {
+          Time: true,
+        },
+      },
     });
   });
 
