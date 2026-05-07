@@ -29,7 +29,7 @@ The local provisioning file uses generic datasource UIDs (`prometheus`, `prometh
 
 ## Release build
 
-GitHub Actions builds the plugin on pushes, pull requests, tags, and manual runs. The workflow runs type checking, linting, unit tests, `npm run build`, and uploads a packaged plugin ZIP named `kubernetes-observability-app-<version>.zip`.
+GitHub Actions builds the plugin on pushes, pull requests, and manual runs. The release workflow uses semantic-release on `main` to create version tags and GitHub releases from Conventional Commits. When a release is created, CI attaches a packaged plugin ZIP named `kubernetes-observability-app-<version>.zip` to the GitHub release.
 
 To run a packaged build locally, download the workflow artifact and extract it so the plugin directory exists at `release/kubernetes-observability-app`:
 
