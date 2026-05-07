@@ -6,6 +6,14 @@ import { kubeletPodStartDurationP95, nodeFilesystemUtilization } from './node';
 import { coreDnsErrorRate, ovnCniRequestLatencyP95, ovnDaemonSetAvailability } from './platformNetworking';
 import { cpuRequests, cpuRequestsToCapacity, cpuUsage, cpuUsageP95, cpuUsageToRequests, memoryWorkingSet, topCpuConsumers } from './resources';
 import { deploymentReadiness, podWaitingReasons } from './scheduling';
+import {
+  searchClustersQuery,
+  searchContainersQuery,
+  searchNamespacesQuery,
+  searchNodesQuery,
+  searchPodsQuery,
+  searchWorkloadsQuery,
+} from './search';
 import { filesystemReadBytes, scopedPersistentVolumeUsageQuery } from './storage';
 
 function compact(query: string) {
@@ -127,6 +135,24 @@ describe('alert query builders', () => {
     expect(query).toContain('severity=~"${severity:regex}"');
     expect(query).toContain('alertname=~"${alertname:regex}"');
     expect(query).toContain('category=~"${alertCategory:regex}"');
+  });
+});
+
+describe('search query builders', () => {
+  it('uses PromQL raw string literals for regex-interpolated text searches', () => {
+    const queries = [
+      searchClustersQuery(),
+      searchNamespacesQuery(),
+      searchWorkloadsQuery(),
+      searchPodsQuery(),
+      searchNodesQuery(),
+      searchContainersQuery(),
+    ];
+
+    expect(queries.join(' ')).not.toContain('=~".*${search:regex}.*"');
+    for (const query of queries) {
+      expect(query).toContain('=~`.*${search:regex}.*`');
+    }
   });
 });
 
