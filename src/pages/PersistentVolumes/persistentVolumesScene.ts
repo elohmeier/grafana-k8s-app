@@ -1,5 +1,5 @@
 import { full, item, pageScene, row } from '../../scenes/common';
-import { tablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
+import { ratioTimeseriesPanel, tablePanel, warningStatPanel } from '../../scenes/panels';
 import { persistentVolumeInventoryQuery, persistentVolumeRiskQuery, persistentVolumeUsageQuery } from '../../queries/storage';
 
 export function persistentVolumesScene() {
@@ -11,7 +11,7 @@ export function persistentVolumesScene() {
       ],
       240
     ),
-    full(timeseriesPanel('PVC used ratio', persistentVolumeUsageQuery(), 'percentunit'), 320),
+    full(ratioTimeseriesPanel('PVC used ratio', persistentVolumeUsageQuery()), 320),
     full(tablePanel('PV/PVC risks', persistentVolumeRiskQuery()), 320),
   ]);
 }

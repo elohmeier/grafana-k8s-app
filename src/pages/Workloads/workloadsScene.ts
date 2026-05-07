@@ -1,15 +1,15 @@
 import { GLOBAL_ALERT_CONTROLS, full, item, pageScene, row } from '../../scenes/common';
 import { alertInventoryQuery, alertsByWorkloadQuery } from '../../queries/alerts';
 import { workloadInventoryQuery } from '../../queries/entity';
-import { linkedTablePanel, tablePanel, timeseriesPanel } from '../../scenes/panels';
+import { linkedTablePanel, ratioTimeseriesPanel, tablePanel, topTablePanel, timeseriesPanel } from '../../scenes/panels';
 import { workloadLink } from '../../utils/entityLinks';
 import {
-  cpuUsageAvg,
-  cpuUsageMax,
   cpuUsageToRequests,
   memoryUsageToRequests,
-  memoryWorkingSetAvg,
-  memoryWorkingSetMax,
+  topCpuConsumers,
+  topCpuUsageToRequests,
+  topMemoryConsumers,
+  topMemoryUsageToRequests,
 } from '../../queries/resources';
 
 export function workloadsScene() {
@@ -18,26 +18,35 @@ export function workloadsScene() {
       full(linkedTablePanel('Workloads', workloadInventoryQuery(), [workloadLink()]), 360),
       row(
         [
-          item(timeseriesPanel('CPU avg by workload', cpuUsageAvg({ workload: '.+' }), 'cores'), '25%', 280),
-          item(timeseriesPanel('CPU max by workload', cpuUsageMax({ workload: '.+' }), 'cores'), '25%', 280),
-          item(timeseriesPanel('Memory avg by workload', memoryWorkingSetAvg({ workload: '.+' }), 'bytes'), '25%', 280),
-          item(timeseriesPanel('Memory max by workload', memoryWorkingSetMax({ workload: '.+' }), 'bytes'), '25%', 280),
+          item(topTablePanel('Top CPU workloads', topCpuConsumers({ workload: '.+' }), 'cores', [workloadLink()]), '25%', 280),
+          item(
+            topTablePanel('Top memory workloads', topMemoryConsumers({ workload: '.+' }), 'bytes', [workloadLink()]),
+            '25%',
+            280
+          ),
+          item(
+            topTablePanel('CPU over requests', topCpuUsageToRequests({ workload: '.+' }), 'percentunit', [workloadLink()]),
+            '25%',
+            280
+          ),
+          item(
+            topTablePanel(
+              'Memory over requests',
+              topMemoryUsageToRequests({ workload: '.+' }),
+              'percentunit',
+              [workloadLink()]
+            ),
+            '25%',
+            280
+          ),
         ],
         300
       ),
       row(
         [
+          item(ratioTimeseriesPanel('CPU usage / requests by workload', cpuUsageToRequests({ workload: '.+' })), '50%', 280),
           item(
-            timeseriesPanel('CPU usage / requests by workload', cpuUsageToRequests({ workload: '.+' }), 'percentunit'),
-            '50%',
-            280
-          ),
-          item(
-            timeseriesPanel(
-              'Memory usage / requests by workload',
-              memoryUsageToRequests({ workload: '.+' }),
-              'percentunit'
-            ),
+            ratioTimeseriesPanel('Memory usage / requests by workload', memoryUsageToRequests({ workload: '.+' })),
             '50%',
             280
           ),

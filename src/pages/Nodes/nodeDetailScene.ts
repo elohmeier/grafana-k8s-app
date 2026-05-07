@@ -1,9 +1,10 @@
 import { DETAIL_ALERT_CONTROLS, full, item, pageScene, row } from '../../scenes/common';
-import { linkedTablePanel, tablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
+import { linkedTablePanel, ratioTimeseriesPanel, tablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
 import { alertCountQuery, alertInventoryQuery } from '../../queries/alerts';
 import { nodeInventoryQuery, podInventoryQuery } from '../../queries/entity';
 import { nodeConditions } from '../../queries/prometheus';
 import { cpuUsage, memoryWorkingSet } from '../../queries/resources';
+import { nodeCpuUtilization, nodeFilesystemUtilization, nodeMemoryUtilization, nodeOomKilledContainers } from '../../queries/node';
 import { nodeLink, podLink } from '../../utils/entityLinks';
 
 export function nodeDetailScene(cluster: string, node: string) {
@@ -26,6 +27,15 @@ export function nodeDetailScene(cluster: string, node: string) {
         ],
         320
       ),
+      row(
+        [
+          item(ratioTimeseriesPanel('Node CPU utilization', nodeCpuUtilization(scope)), '33%', 280),
+          item(ratioTimeseriesPanel('Node memory utilization', nodeMemoryUtilization(scope)), '33%', 280),
+          item(ratioTimeseriesPanel('Node filesystem utilization', nodeFilesystemUtilization(scope)), '34%', 280),
+        ],
+        300
+      ),
+      full(linkedTablePanel('OOMKilled containers on node', nodeOomKilledContainers(scope), [podLink()]), 280),
       full(linkedTablePanel('Pods on node', podInventoryQuery(scope), [podLink()]), 320),
       full(tablePanel('Node alerts', alertInventoryQuery(scope)), 300),
     ],

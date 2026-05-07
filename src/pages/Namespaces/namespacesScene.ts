@@ -1,16 +1,15 @@
 import { GLOBAL_ALERT_CONTROLS, full, item, pageScene, row } from '../../scenes/common';
 import { namespaceInventoryQuery } from '../../queries/entity';
 import { namespaceCpuUsage, namespaceMemoryWorkingSet, namespaceQuota } from '../../queries/prometheus';
-import { linkedTablePanel, tablePanel, timeseriesPanel } from '../../scenes/panels';
+import { linkedTablePanel, ratioTimeseriesPanel, tablePanel, topTablePanel, timeseriesPanel } from '../../scenes/panels';
 import { namespaceLink } from '../../utils/entityLinks';
 import { alertsByNamespaceQuery } from '../../queries/alerts';
+import { podsNotReadyByNamespace, restartHotspots } from '../../queries/health';
 import {
-  cpuUsageAvg,
-  cpuUsageMax,
   cpuUsageToRequests,
   memoryUsageToRequests,
-  memoryWorkingSetAvg,
-  memoryWorkingSetMax,
+  topCpuConsumers,
+  topMemoryConsumers,
 } from '../../queries/resources';
 
 export function namespacesScene() {
@@ -26,18 +25,18 @@ export function namespacesScene() {
       ),
       row(
         [
-          item(timeseriesPanel('CPU avg by namespace', cpuUsageAvg(), 'cores'), '25%', 280),
-          item(timeseriesPanel('CPU max by namespace', cpuUsageMax(), 'cores'), '25%', 280),
-          item(timeseriesPanel('Memory avg by namespace', memoryWorkingSetAvg(), 'bytes'), '25%', 280),
-          item(timeseriesPanel('Memory max by namespace', memoryWorkingSetMax(), 'bytes'), '25%', 280),
+          item(topTablePanel('Pods not ready by namespace', podsNotReadyByNamespace(), 'short', [namespaceLink()]), '25%', 280),
+          item(topTablePanel('Top CPU namespaces', topCpuConsumers(), 'cores', [namespaceLink()]), '25%', 280),
+          item(topTablePanel('Top memory namespaces', topMemoryConsumers(), 'bytes', [namespaceLink()]), '25%', 280),
+          item(topTablePanel('Restart hotspots', restartHotspots(), 'short'), '25%', 280),
         ],
         300
       ),
       row(
         [
-          item(timeseriesPanel('CPU usage / requests by namespace', cpuUsageToRequests(), 'percentunit'), '33%', 260),
+          item(ratioTimeseriesPanel('CPU usage / requests by namespace', cpuUsageToRequests()), '33%', 260),
           item(
-            timeseriesPanel('Memory usage / requests by namespace', memoryUsageToRequests(), 'percentunit'),
+            ratioTimeseriesPanel('Memory usage / requests by namespace', memoryUsageToRequests()),
             '33%',
             260
           ),

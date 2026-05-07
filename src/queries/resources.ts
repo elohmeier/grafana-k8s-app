@@ -360,3 +360,15 @@ export function topMemoryConsumers(scope: EntityScope = {}) {
 topk(10, ${memoryWorkingSet(scope).trim()})
 `;
 }
+
+export function topCpuUsageToRequests(scope: EntityScope = {}) {
+  return `
+topk(10, ${cpuUsageToRequests(scope).trim()})
+`;
+}
+
+export function topMemoryUsageToRequests(scope: EntityScope = {}) {
+  return `
+topk(10, ${memoryUsageToRequests(scope).trim()})
+`;
+}

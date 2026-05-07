@@ -1,9 +1,10 @@
 import { DETAIL_ALERT_CONTROLS, full, item, pageScene, row } from '../../scenes/common';
-import { linkedTablePanel, tablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
+import { linkedTablePanel, ratioTimeseriesPanel, tablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
 import { alertCountQuery, alertInventoryQuery } from '../../queries/alerts';
 import { containerInventoryQuery } from '../../queries/entity';
 import { podPhases } from '../../queries/prometheus';
-import { cpuUsage, memoryWorkingSet } from '../../queries/resources';
+import { cpuUsage, cpuUsageToRequests, memoryUsageToRequests, memoryWorkingSet } from '../../queries/resources';
+import { scopedPersistentVolumeRiskQuery, scopedPersistentVolumeUsageQuery } from '../../queries/storage';
 import { podLogsLink } from '../../utils/entityLinks';
 
 export function podDetailScene(cluster: string, namespace: string, pod: string) {
@@ -26,6 +27,15 @@ export function podDetailScene(cluster: string, namespace: string, pod: string) 
         ],
         320
       ),
+      row(
+        [
+          item(ratioTimeseriesPanel('CPU usage / requests', cpuUsageToRequests(scope)), '33%', 280),
+          item(ratioTimeseriesPanel('Memory usage / requests', memoryUsageToRequests(scope)), '33%', 280),
+          item(ratioTimeseriesPanel('PVC used ratio', scopedPersistentVolumeUsageQuery(scope)), '34%', 280),
+        ],
+        300
+      ),
+      full(tablePanel('PVC risks', scopedPersistentVolumeRiskQuery(scope)), 260),
       full(tablePanel('Pod alerts', alertInventoryQuery(scope)), 300),
     ],
     'now-1h',

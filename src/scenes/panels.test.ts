@@ -40,6 +40,9 @@ describe('panel query construction', () => {
         excludeByName: {
           Time: true,
         },
+        renameByName: {
+          Value: 'value',
+        },
       },
     });
   });

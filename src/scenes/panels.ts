@@ -10,6 +10,11 @@ type PromRunnerOptions = {
   timeRangeCompare?: boolean;
 };
 
+type ThresholdStep = {
+  color: string;
+  value: number;
+};
+
 export function promRunner(expr: string, refId = 'A', options: PromRunnerOptions = {}) {
   const instant = options.instant ?? false;
 
@@ -41,10 +46,28 @@ export function prometheusTableData(expr: string) {
           excludeByName: {
             Time: true,
           },
+          renameByName: {
+            Value: 'value',
+          },
         },
       },
     ],
   });
+}
+
+function absoluteThresholds(steps: ThresholdStep[]) {
+  return {
+    mode: ThresholdsMode.Absolute,
+    steps,
+  };
+}
+
+function percentThresholds() {
+  return absoluteThresholds([
+    { color: 'green', value: -Infinity },
+    { color: 'yellow', value: 0.8 },
+    { color: 'red', value: 0.9 },
+  ]);
 }
 
 export function legendFromPromQuery(expr: string) {
@@ -99,6 +122,19 @@ export function statPanel(title: string, expr: string) {
     .build();
 }
 
+export function percentStatPanel(title: string, expr: string) {
+  return PanelBuilders.stat()
+    .setTitle(title)
+    .setData(promRunner(expr, 'A', { instant: true, timeRangeCompare: false }))
+    .setNoValue('-')
+    .setUnit('percentunit')
+    .setDecimals(1)
+    .setMin(0)
+    .setMax(1)
+    .setThresholds(percentThresholds())
+    .build();
+}
+
 export function tablePanel(title: string, expr: string) {
   return PanelBuilders.table()
     .setTitle(title)
@@ -106,6 +142,25 @@ export function tablePanel(title: string, expr: string) {
     .setNoValue('-')
     .setFilterable(true)
     .build();
+}
+
+export function topTablePanel(title: string, expr: string, unit?: string, links: DataLink[] = []) {
+  let builder = PanelBuilders.table()
+    .setTitle(title)
+    .setData(prometheusTableData(expr))
+    .setNoValue('-')
+    .setDecimals(unit === 'percentunit' ? 2 : 1)
+    .setFilterable(true);
+
+  if (unit) {
+    builder = builder.setUnit(unit);
+  }
+
+  if (links.length > 0) {
+    builder = builder.setLinks(links);
+  }
+
+  return builder.build();
 }
 
 export function linkedTablePanel(title: string, expr: string, links: DataLink[]) {
@@ -163,6 +218,20 @@ export function timeseriesPanel(title: string, expr: string, unit?: string) {
   return builder.build();
 }
 
+export function ratioTimeseriesPanel(title: string, expr: string) {
+  return PanelBuilders.timeseries()
+    .setTitle(title)
+    .setData(promRunner(expr, 'A', { legendFormat: legendFromPromQuery(expr) }))
+    .setNoValue('-')
+    .setUnit('percentunit')
+    .setDecimals(2)
+    .setMin(0)
+    .setMax(1)
+    .setThresholds(percentThresholds())
+    .setColor({ mode: FieldColorModeId.PaletteClassic })
+    .build();
+}
+
 export function warningStatPanel(title: string, expr: string) {
   return PanelBuilders.stat()
     .setTitle(title)
@@ -175,6 +244,21 @@ export function warningStatPanel(title: string, expr: string) {
         { color: 'red', value: 1 },
       ],
     })
+    .build();
+}
+
+export function criticalStatPanel(title: string, expr: string) {
+  return PanelBuilders.stat()
+    .setTitle(title)
+    .setData(promRunner(expr, 'A', { instant: true, timeRangeCompare: false }))
+    .setNoValue('0')
+    .setThresholds(
+      absoluteThresholds([
+        { color: 'green', value: -Infinity },
+        { color: 'yellow', value: 1 },
+        { color: 'red', value: 5 },
+      ])
+    )
     .build();
 }
 

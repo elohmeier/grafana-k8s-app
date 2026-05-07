@@ -1,5 +1,15 @@
 import { full, item, pageScene, row } from '../../scenes/common';
-import { linkedTablePanel, warningStatPanel } from '../../scenes/panels';
+import { linkedTablePanel, tablePanel, topTablePanel, warningStatPanel } from '../../scenes/panels';
+import {
+  crashLoopingPods,
+  nodePressureByCondition,
+  nodesNotReady,
+  pendingPods,
+  podsNotReady,
+  podsNotReadyByNamespace,
+  restartHotspots,
+  waitingReasonsByReason,
+} from '../../queries/health';
 import { nodeLink, podLink } from '../../utils/entityLinks';
 
 export function healthScene() {
@@ -7,51 +17,38 @@ export function healthScene() {
     row(
       [
         item(
-          warningStatPanel(
-            'Nodes not ready',
-            'count(kube_node_status_condition{cluster=~"${cluster:regex}", condition="Ready", status=~"false|unknown"} == 1)'
-          ),
+          warningStatPanel('Nodes not ready', nodesNotReady()),
           '25%',
           150
         ),
         item(
-          warningStatPanel(
-            'Pods not ready',
-            'count(kube_pod_status_ready{cluster=~"${cluster:regex}", namespace=~"${namespace:regex}", condition="false"} == 1)'
-          ),
+          warningStatPanel('Pods not ready', podsNotReady()),
           '25%',
           150
         ),
         item(
-          warningStatPanel(
-            'Crash loops',
-            'count(increase(kube_pod_container_status_restarts_total{cluster=~"${cluster:regex}", namespace=~"${namespace:regex}"}[$__range]) > 2)'
-          ),
+          warningStatPanel('Crash loops', crashLoopingPods()),
           '25%',
           150
         ),
-        item(
-          warningStatPanel(
-            'Pending pods',
-            'count(kube_pod_status_phase{cluster=~"${cluster:regex}", namespace=~"${namespace:regex}", phase="Pending"} == 1)'
-          ),
-          '25%',
-          150
-        ),
+        item(warningStatPanel('Pending pods', pendingPods()), '25%', 150),
       ],
       160
     ),
     row(
       [
         item(
-          linkedTablePanel(
-            'Node pressure',
-            'max by (cluster, node, condition) (kube_node_status_condition{cluster=~"${cluster:regex}", condition=~"MemoryPressure|DiskPressure|PIDPressure", status="true"} == 1)',
-            [nodeLink()]
-          ),
+          linkedTablePanel('Node pressure', nodePressureByCondition(), [nodeLink()]),
           '50%',
           280
         ),
+        item(topTablePanel('Pods not ready by namespace', podsNotReadyByNamespace(), 'short'), '50%', 280),
+      ],
+      300
+    ),
+    row(
+      [
+        item(tablePanel('Waiting reasons by namespace', waitingReasonsByReason()), '50%', 280),
         item(
           linkedTablePanel(
             'Image pull failures',
@@ -64,6 +61,7 @@ export function healthScene() {
       ],
       300
     ),
+    full(topTablePanel('Restart hotspots', restartHotspots(), 'short', [podLink()]), 300),
     full(
       linkedTablePanel(
         'OOMKilled containers',

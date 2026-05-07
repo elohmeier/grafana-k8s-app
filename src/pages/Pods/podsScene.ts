@@ -1,10 +1,19 @@
 import { full, item, pageScene, row } from '../../scenes/common';
-import { linkedTablePanel, timeseriesPanel } from '../../scenes/panels';
+import { linkedTablePanel, topTablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
 import { podInventoryQuery } from '../../queries/entity';
+import { pendingPods, podsNotReady, restartHotspots } from '../../queries/health';
 import { podLink } from '../../utils/entityLinks';
 
 export function podsScene() {
   return pageScene([
+    row(
+      [
+        item(warningStatPanel('Pods not ready', podsNotReady()), '33%', 150),
+        item(warningStatPanel('Pending pods', pendingPods()), '33%', 150),
+        item(topTablePanel('Restart hotspots', restartHotspots(), 'short', [podLink()]), '34%', 220),
+      ],
+      240
+    ),
     full(linkedTablePanel('Pods', podInventoryQuery(), [podLink()]), 360),
     row(
       [

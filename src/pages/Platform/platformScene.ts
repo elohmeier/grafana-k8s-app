@@ -1,19 +1,37 @@
-import { CLUSTER_CONTROLS, full, pageScene } from '../../scenes/common';
-import { tablePanel, textPanel } from '../../scenes/panels';
+import { CLUSTER_CONTROLS, full, item, pageScene, row } from '../../scenes/common';
+import { tablePanel, warningStatPanel } from '../../scenes/panels';
 
 export function platformScene() {
   return pageScene(
     [
-      full(
-        textPanel(
-          'Platform Operations backlog',
-          [
-            'Specialist pages will consolidate control plane/API performance, etcd, OVN, ingress, CoreDNS, Prometheus, remote-write, Alertmanager, Vector/logging, ArgoCD, Kyverno, cert-manager, KEDA, Trident, install plans, managed upgrades, compliance, and security views.',
-            '',
-            'This page starts with Prometheus-backed health summaries and keeps deep panels out of the default application-team flow.',
-          ].join('\n')
-        ),
-        200
+      row(
+        [
+          item(
+            warningStatPanel(
+              'Unhealthy ArgoCD apps',
+              'count(argocd_app_info{cluster=~"${cluster:regex}", health_status!~"Healthy|Progressing"})'
+            ),
+            '33%',
+            150
+          ),
+          item(
+            warningStatPanel(
+              'Out-of-sync ArgoCD apps',
+              'count(argocd_app_info{cluster=~"${cluster:regex}", sync_status!="Synced"})'
+            ),
+            '33%',
+            150
+          ),
+          item(
+            warningStatPanel(
+              'Certificates not ready',
+              'count(certmanager_certificate_ready_status{cluster=~"${cluster:regex}", condition="Ready", status!="True"})'
+            ),
+            '34%',
+            150
+          ),
+        ],
+        180
       ),
       full(
         tablePanel(

@@ -1,5 +1,5 @@
 import { DETAIL_ALERT_CONTROLS, full, item, pageScene, row } from '../../scenes/common';
-import { linkedTablePanel, tablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
+import { linkedTablePanel, ratioTimeseriesPanel, tablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
 import { alertCountQuery, alertInventoryQuery } from '../../queries/alerts';
 import {
   namespaceInventoryQuery,
@@ -8,6 +8,8 @@ import {
   workloadInventoryQuery,
 } from '../../queries/entity';
 import { clusterCpuUsage, clusterMemoryWorkingSet, nodeConditions, podPhases } from '../../queries/prometheus';
+import { cpuUsageToRequests, memoryUsageToRequests } from '../../queries/resources';
+import { scopedPersistentVolumeRiskQuery } from '../../queries/storage';
 import { namespaceLink, nodeLink, podLink, workloadLink } from '../../utils/entityLinks';
 
 export function clusterDetailScene(cluster: string) {
@@ -29,6 +31,14 @@ export function clusterDetailScene(cluster: string) {
           item(timeseriesPanel('Memory working set', clusterMemoryWorkingSet(scope), 'bytes'), '50%', 300),
         ],
         320
+      ),
+      row(
+        [
+          item(ratioTimeseriesPanel('CPU usage / requests', cpuUsageToRequests(scope)), '33%', 280),
+          item(ratioTimeseriesPanel('Memory usage / requests', memoryUsageToRequests(scope)), '33%', 280),
+          item(tablePanel('PVC risks', scopedPersistentVolumeRiskQuery(scope)), '34%', 280),
+        ],
+        300
       ),
       full(linkedTablePanel('Namespaces in cluster', namespaceInventoryQuery(scope), [namespaceLink()]), 320),
       full(linkedTablePanel('Workloads in cluster', workloadInventoryQuery(scope), [workloadLink()]), 320),
