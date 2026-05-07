@@ -20,7 +20,8 @@ services:
     environment:
       GF_LOG_FILTERS: plugin.kubernetes-observability-app:debug
       GF_LOG_LEVEL: info
-      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: kubernetes-observability-app
+      GF_INSTALL_PLUGINS: https://github.com/elohmeier/rqlite-datasource/releases/download/v1.1.5/g42-rqlite-datasource-1.1.5.zip;g42-rqlite-datasource
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: kubernetes-observability-app,g42-rqlite-datasource
       GF_AUTH_ANONYMOUS_ENABLED: 'true'
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
 

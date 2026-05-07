@@ -5,6 +5,9 @@ services:
       service: grafana
     depends_on:
       - prometheus
+    environment:
+      GF_INSTALL_PLUGINS: https://github.com/elohmeier/rqlite-datasource/releases/download/v1.1.5/g42-rqlite-datasource-1.1.5.zip;g42-rqlite-datasource
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: kubernetes-observability-app,g42-rqlite-datasource
 
   prometheus:
     image: prom/prometheus:v2.55.1
