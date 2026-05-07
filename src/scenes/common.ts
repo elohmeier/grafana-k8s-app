@@ -7,11 +7,38 @@ import {
   SceneTimeRange,
   SceneTimeRangeCompare,
   type SceneVariable,
+  VariableValueControl,
   VariableValueSelectors,
 } from '@grafana/scenes';
 import { getGlobalVariables } from './variables';
 
-export function pageScene(children: SceneFlexItem[], from = 'now-1h', extraVariables: SceneVariable[] = []) {
+export const METRICS_CONTROLS = ['datasource'] as const;
+export const CLUSTER_CONTROLS = ['datasource', 'cluster'] as const;
+export const NAMESPACE_CONTROLS = ['datasource', 'cluster', 'namespace'] as const;
+export const SEARCH_CONTROLS = ['datasource', 'search'] as const;
+export const LOG_CONTROLS = ['elasticsearch'] as const;
+export const METADATA_CONTROLS = ['infraDatasource'] as const;
+export const ALERT_FILTER_CONTROLS = ['severity', 'alertname', 'alertCategory'] as const;
+export const CLUSTER_ALERT_CONTROLS = ['datasource', 'cluster', ...ALERT_FILTER_CONTROLS] as const;
+export const GLOBAL_ALERT_CONTROLS = ['datasource', 'cluster', 'namespace', ...ALERT_FILTER_CONTROLS] as const;
+export const DETAIL_ALERT_CONTROLS = ['datasource', ...ALERT_FILTER_CONTROLS] as const;
+
+type VariableControls = readonly string[] | 'all';
+
+function variableControls(controls: VariableControls) {
+  if (controls === 'all') {
+    return [new VariableValueSelectors({})];
+  }
+
+  return controls.map((variableName) => new VariableValueControl({ variableName }));
+}
+
+export function pageScene(
+  children: SceneFlexItem[],
+  from = 'now-1h',
+  extraVariables: SceneVariable[] = [],
+  controls: VariableControls = NAMESPACE_CONTROLS
+) {
   return new EmbeddedScene({
     $timeRange: new SceneTimeRange({
       from,
@@ -20,7 +47,7 @@ export function pageScene(children: SceneFlexItem[], from = 'now-1h', extraVaria
     }),
     $variables: getGlobalVariables(extraVariables),
     controls: [
-      new VariableValueSelectors({}),
+      ...variableControls(controls),
       new SceneTimeRangeCompare({
         hideCheckbox: true,
       }),

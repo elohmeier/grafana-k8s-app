@@ -1,5 +1,5 @@
 import { TextBoxVariable } from '@grafana/scenes';
-import { full, item, pageScene, row } from '../../scenes/common';
+import { SEARCH_CONTROLS, full, item, pageScene, row } from '../../scenes/common';
 import { linkedTablePanel, tablePanel, textPanel } from '../../scenes/panels';
 import {
   searchClustersQuery,
@@ -50,6 +50,7 @@ export function searchScene() {
       ),
     ],
     'now-1h',
-    [searchVariable]
+    [searchVariable],
+    SEARCH_CONTROLS
   );
 }
