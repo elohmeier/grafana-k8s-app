@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.0.6...v1.1.0) (2026-05-07)
+
+
+### Features
+
+* improve Kubernetes dashboard triage views ([f67ee45](https://github.com/elohmeier/grafana-k8s-app/commit/f67ee45f172967374d53937e87001d4da0831807))
+
 ## [1.0.6](https://github.com/elohmeier/grafana-k8s-app/compare/v1.0.5...v1.0.6) (2026-05-07)
 
 
