@@ -7,8 +7,18 @@ services:
     ports:
       - '${GRAFANA_PORT:-3010}:3000'
     volumes:
-      - ${PLUGIN_DIR:-./release/kubernetes-observability-app}:/var/lib/grafana/plugins/kubernetes-observability-app:ro
-      - ./provisioning:/etc/grafana/provisioning:ro
+      - type: bind
+        source: ${PLUGIN_DIR:-./kubernetes-observability-app}
+        target: /var/lib/grafana/plugins/kubernetes-observability-app
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./provisioning
+        target: /etc/grafana/provisioning
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       GF_LOG_FILTERS: plugin.kubernetes-observability-app:debug
       GF_LOG_LEVEL: info
@@ -22,4 +32,9 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=2h
     volumes:
-      - ./provisioning/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - type: bind
+        source: ./provisioning/prometheus/prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+        bind:
+          create_host_path: false

@@ -31,15 +31,14 @@ The local provisioning file uses generic datasource UIDs (`prometheus`, `prometh
 
 GitHub Actions builds the plugin on pushes, pull requests, and manual runs. The release workflow uses semantic-release on `main` to create version tags and GitHub releases from Conventional Commits. When a release is created, CI attaches a packaged plugin ZIP named `kubernetes-observability-app-<version>.zip` to the GitHub release.
 
-To run a packaged build locally, download the workflow artifact and extract it so the plugin directory exists at `release/kubernetes-observability-app`:
+To run a packaged build locally, download the release ZIP and extract it in the repository root so the plugin directory exists at `kubernetes-observability-app`:
 
 ```bash
-mkdir -p release
-unzip kubernetes-observability-app-*.zip -d release
+unzip kubernetes-observability-app-*.zip
 docker compose -f docker-compose.release.yaml up
 ```
 
-Grafana is available at <http://localhost:3010>. The release compose file also mounts `provisioning/` and starts the local Prometheus container used by the development setup.
+Grafana is available at <http://localhost:3010>. The release compose file also mounts `provisioning/` and starts the local Prometheus container used by the development setup. If you extract the ZIP somewhere else, set `PLUGIN_DIR` to that extracted `kubernetes-observability-app` directory.
 
 For a one-off `docker run`, extract the ZIP the same way and mount the plugin plus provisioning directories:
 
@@ -48,7 +47,7 @@ docker run --rm -p 3010:3000 \
   -e GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=kubernetes-observability-app \
   -e GF_AUTH_ANONYMOUS_ENABLED=true \
   -e GF_AUTH_ANONYMOUS_ORG_ROLE=Admin \
-  -v "$PWD/release/kubernetes-observability-app:/var/lib/grafana/plugins/kubernetes-observability-app:ro" \
+  -v "$PWD/kubernetes-observability-app:/var/lib/grafana/plugins/kubernetes-observability-app:ro" \
   -v "$PWD/provisioning:/etc/grafana/provisioning:ro" \
   grafana/grafana-enterprise:12.3.2
 ```
