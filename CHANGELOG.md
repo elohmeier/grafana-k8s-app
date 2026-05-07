@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/elohmeier/grafana-k8s-app/compare/v1.0.2...v1.0.3) (2026-05-07)
+
+
+### Bug Fixes
+
+* support wsl docker bind mounts ([aecf4e9](https://github.com/elohmeier/grafana-k8s-app/commit/aecf4e9fc50689517bf0f38c9109f37bb663323b))
+
 ## [1.0.2](https://github.com/elohmeier/grafana-k8s-app/compare/v1.0.1...v1.0.2) (2026-05-07)
 
 
