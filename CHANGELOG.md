@@ -1,3 +1,12 @@
+## [1.0.4](https://github.com/elohmeier/grafana-k8s-app/compare/v1.0.3...v1.0.4) (2026-05-07)
+
+
+### Bug Fixes
+
+* create fresh scene app pages ([fdd7bf8](https://github.com/elohmeier/grafana-k8s-app/commit/fdd7bf84b65d08a31fa62b1a7f471041ec69a833))
+* escape search PromQL regexes ([9c33f55](https://github.com/elohmeier/grafana-k8s-app/commit/9c33f55fe8eeeb91de9f9668be5a296984abc52f))
+* set Prometheus panel query formats ([13d9571](https://github.com/elohmeier/grafana-k8s-app/commit/13d9571c3f5e319bb2d0380183288cdad29aa08d))
+
 ## [1.0.3](https://github.com/elohmeier/grafana-k8s-app/compare/v1.0.2...v1.0.3) (2026-05-07)
 
 
