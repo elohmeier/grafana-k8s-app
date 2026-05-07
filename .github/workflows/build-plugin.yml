@@ -1,0 +1,67 @@
+name: Build plugin
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test:ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Package plugin
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          plugin_id="$(node -p "require('./src/plugin.json').id")"
+          version="$(node -p "require('./package.json').version")"
+          archive="${plugin_id}-${version}.zip"
+
+          mkdir -p "artifacts/${plugin_id}"
+          cp -R dist/. "artifacts/${plugin_id}/"
+          (cd artifacts && zip -r "../${archive}" "${plugin_id}")
+
+          echo "plugin_id=${plugin_id}" >> "${GITHUB_OUTPUT}"
+          echo "archive=${archive}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload packaged plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.archive }}
+          path: ${{ steps.package.outputs.archive }}
+          if-no-files-found: error

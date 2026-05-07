@@ -26,3 +26,29 @@ npm run server
 ```
 
 The local provisioning file uses generic datasource UIDs (`prometheus`, `prometheus-nonprod`, `elasticsearch`, and `infra-metadata`). In production, override these with existing Grafana datasource variables or provisioning.
+
+## Release build
+
+GitHub Actions builds the plugin on pushes, pull requests, tags, and manual runs. The workflow runs type checking, linting, unit tests, `npm run build`, and uploads a packaged plugin ZIP named `kubernetes-observability-app-<version>.zip`.
+
+To run a packaged build locally, download the workflow artifact and extract it so the plugin directory exists at `release/kubernetes-observability-app`:
+
+```bash
+mkdir -p release
+unzip kubernetes-observability-app-*.zip -d release
+docker compose -f docker-compose.release.yaml up
+```
+
+Grafana is available at <http://localhost:3010>. The release compose file also mounts `provisioning/` and starts the local Prometheus container used by the development setup.
+
+For a one-off `docker run`, extract the ZIP the same way and mount the plugin plus provisioning directories:
+
+```bash
+docker run --rm -p 3010:3000 \
+  -e GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=kubernetes-observability-app \
+  -e GF_AUTH_ANONYMOUS_ENABLED=true \
+  -e GF_AUTH_ANONYMOUS_ORG_ROLE=Admin \
+  -v "$PWD/release/kubernetes-observability-app:/var/lib/grafana/plugins/kubernetes-observability-app:ro" \
+  -v "$PWD/provisioning:/etc/grafana/provisioning:ro" \
+  grafana/grafana-enterprise:12.3.2
+```

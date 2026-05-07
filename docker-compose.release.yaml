@@ -1,0 +1,25 @@
+services:
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana-enterprise:12.3.2}
+    container_name: kubernetes-observability-app-release
+    depends_on:
+      - prometheus
+    ports:
+      - '${GRAFANA_PORT:-3010}:3000'
+    volumes:
+      - ${PLUGIN_DIR:-./release/kubernetes-observability-app}:/var/lib/grafana/plugins/kubernetes-observability-app:ro
+      - ./provisioning:/etc/grafana/provisioning:ro
+    environment:
+      GF_LOG_FILTERS: plugin.kubernetes-observability-app:debug
+      GF_LOG_LEVEL: info
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: kubernetes-observability-app
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2h
+    volumes:
+      - ./provisioning/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
