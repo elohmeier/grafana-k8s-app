@@ -4,7 +4,9 @@ import { DataSourceRef } from '@grafana/schema';
 import { elasticsearchDatasource, infraDatasource, prometheusDatasource } from '../queries/datasources';
 
 type PromRunnerOptions = {
+  format?: 'time_series' | 'table';
   instant?: boolean;
+  legendFormat?: string;
   timeRangeCompare?: boolean;
 };
 
@@ -17,7 +19,9 @@ export function promRunner(expr: string, refId = 'A', options: PromRunnerOptions
       {
         refId,
         expr,
+        format: options.format ?? 'time_series',
         instant,
+        legendFormat: options.legendFormat,
         range: !instant,
         timeRangeCompare: options.timeRangeCompare,
       },
@@ -25,6 +29,35 @@ export function promRunner(expr: string, refId = 'A', options: PromRunnerOptions
     maxDataPoints: 800,
     minInterval: '30s',
   });
+}
+
+export function legendFromPromQuery(expr: string) {
+  const normalizedExpr = expr.replace(/\$\{[^}]+\}/g, '$var');
+  const byMatches = Array.from(normalizedExpr.matchAll(/\bby\s*\(([^)]+)\)/g));
+  const labels = byMatches
+    .map((match) =>
+      match[1]
+        .split(',')
+        .map((label) => label.trim())
+        .filter((label) => label && label !== 'le')
+    )
+    .filter((matchLabels) => matchLabels.length > 0);
+  const shortestLabels = labels.sort((a, b) => a.length - b.length)[0];
+
+  if (shortestLabels) {
+    return shortestLabels.map((label) => `{{${label}}}`).join(' / ');
+  }
+
+  const selectorLabels = Array.from(normalizedExpr.matchAll(/\{([^}]+)\}/g)).flatMap((match) =>
+    match[1]
+      .split(',')
+      .map((matcher) => matcher.match(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:!?=|!?=~)/)?.[1])
+      .filter((label): label is string => Boolean(label))
+  );
+  const legendLabels = ['cluster', 'namespace', 'workload', 'workload_type', 'node', 'pod', 'container', 'mountpoint', 'device'];
+  const labelsInOrder = legendLabels.filter((label) => selectorLabels.includes(label));
+
+  return labelsInOrder.map((label) => `{{${label}}}`).join(' / ');
 }
 
 export function datasourceRunner(datasource: DataSourceRef, query: Record<string, unknown>, refId = 'A') {
@@ -53,7 +86,7 @@ export function statPanel(title: string, expr: string) {
 export function tablePanel(title: string, expr: string) {
   return PanelBuilders.table()
     .setTitle(title)
-    .setData(promRunner(expr, 'A', { instant: true, timeRangeCompare: false }))
+    .setData(promRunner(expr, 'A', { format: 'table', instant: true, legendFormat: '', timeRangeCompare: false }))
     .setNoValue('-')
     .build();
 }
@@ -61,7 +94,7 @@ export function tablePanel(title: string, expr: string) {
 export function linkedTablePanel(title: string, expr: string, links: DataLink[]) {
   return PanelBuilders.table()
     .setTitle(title)
-    .setData(promRunner(expr, 'A', { instant: true, timeRangeCompare: false }))
+    .setData(promRunner(expr, 'A', { format: 'table', instant: true, legendFormat: '', timeRangeCompare: false }))
     .setNoValue('-')
     .setLinks(links)
     .build();
@@ -101,7 +134,7 @@ export function infraTablePanel(title: string, rawSql: string) {
 export function timeseriesPanel(title: string, expr: string, unit?: string) {
   let builder = PanelBuilders.timeseries()
     .setTitle(title)
-    .setData(promRunner(expr))
+    .setData(promRunner(expr, 'A', { legendFormat: legendFromPromQuery(expr) }))
     .setNoValue('-')
     .setColor({ mode: FieldColorModeId.PaletteClassic });
 
