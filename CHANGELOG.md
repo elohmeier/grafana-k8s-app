@@ -1,3 +1,11 @@
+## [1.0.5](https://github.com/elohmeier/grafana-k8s-app/compare/v1.0.4...v1.0.5) (2026-05-07)
+
+
+### Bug Fixes
+
+* drop note ([985c0d6](https://github.com/elohmeier/grafana-k8s-app/commit/985c0d69c851fdf88add9a4ff45d768ad6fef583))
+* shape Prometheus tables ([55576b5](https://github.com/elohmeier/grafana-k8s-app/commit/55576b510f3d9611add5f676fb9a3f0e10548f3f))
+
 ## [1.0.4](https://github.com/elohmeier/grafana-k8s-app/compare/v1.0.3...v1.0.4) (2026-05-07)
 
 
