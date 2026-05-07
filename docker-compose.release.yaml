@@ -10,13 +10,11 @@ services:
       - type: bind
         source: ${PLUGIN_DIR:-./kubernetes-observability-app}
         target: /var/lib/grafana/plugins/kubernetes-observability-app
-        read_only: true
         bind:
           create_host_path: false
       - type: bind
         source: ./provisioning
         target: /etc/grafana/provisioning
-        read_only: true
         bind:
           create_host_path: false
     environment:
@@ -35,6 +33,5 @@ services:
       - type: bind
         source: ./provisioning/prometheus
         target: /etc/prometheus
-        read_only: true
         bind:
           create_host_path: false
