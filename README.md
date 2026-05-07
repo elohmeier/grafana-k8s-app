@@ -10,7 +10,10 @@ The implementation is driven by:
 
 ## Development
 
+Use Node 22 LTS or Node 24. The repo includes `.nvmrc` with Node 22 because the Grafana plugin e2e tooling does not support Node 25 yet.
+
 ```bash
+nvm use
 npm install
 npm run typecheck
 npm run build
