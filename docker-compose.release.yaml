@@ -8,11 +8,6 @@ services:
       - '${GRAFANA_PORT:-3010}:3000'
     volumes:
       - type: bind
-        source: ${PLUGIN_DIR:-./kubernetes-observability-app}
-        target: /var/lib/grafana/plugins/kubernetes-observability-app
-        bind:
-          create_host_path: false
-      - type: bind
         source: ./provisioning
         target: /etc/grafana/provisioning
         bind:
@@ -20,7 +15,7 @@ services:
     environment:
       GF_LOG_FILTERS: plugin.kubernetes-observability-app:debug
       GF_LOG_LEVEL: info
-      GF_INSTALL_PLUGINS: https://github.com/elohmeier/rqlite-datasource/releases/download/v1.1.5/g42-rqlite-datasource-1.1.5.zip;g42-rqlite-datasource
+      GF_INSTALL_PLUGINS: https://github.com/elohmeier/rqlite-datasource/releases/download/v1.1.5/g42-rqlite-datasource-1.1.5.zip;g42-rqlite-datasource,https://github.com/elohmeier/grafana-k8s-app/releases/download/v1.0.3/kubernetes-observability-app-1.0.3.zip;kubernetes-observability-app
       GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: kubernetes-observability-app,g42-rqlite-datasource
       GF_AUTH_ANONYMOUS_ENABLED: 'true'
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
