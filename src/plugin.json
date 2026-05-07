@@ -1,0 +1,105 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "app",
+  "name": "Kubernetes Observability",
+  "id": "kubernetes-observability-app",
+  "info": {
+    "keywords": ["kubernetes", "openshift", "prometheus", "thanos"],
+    "description": "Enterprise Kubernetes and OpenShift observability app with Prometheus, Elasticsearch, and optional infrastructure metadata integrations.",
+    "author": {
+      "name": "Grafana Kubernetes Observability Contributors"
+    },
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "screenshots": [],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "includes": [
+    {
+      "type": "page",
+      "name": "Overview",
+      "path": "/a/%PLUGIN_ID%/overview",
+      "addToNav": true,
+      "defaultNav": true
+    },
+    {
+      "type": "page",
+      "name": "Search",
+      "path": "/a/%PLUGIN_ID%/search",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Health",
+      "path": "/a/%PLUGIN_ID%/health",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Clusters",
+      "path": "/a/%PLUGIN_ID%/clusters",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Namespaces",
+      "path": "/a/%PLUGIN_ID%/namespaces",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Workloads",
+      "path": "/a/%PLUGIN_ID%/workloads",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Pods",
+      "path": "/a/%PLUGIN_ID%/pods",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Nodes",
+      "path": "/a/%PLUGIN_ID%/nodes",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Persistent Volumes",
+      "path": "/a/%PLUGIN_ID%/persistent-volumes",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Jobs",
+      "path": "/a/%PLUGIN_ID%/jobs",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Alerts",
+      "path": "/a/%PLUGIN_ID%/alerts",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Platform Operations",
+      "path": "/a/%PLUGIN_ID%/platform",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Configuration",
+      "path": "/a/%PLUGIN_ID%/configuration",
+      "addToNav": true
+    }
+  ],
+  "dependencies": {
+    "grafanaDependency": ">=12.3.0",
+    "plugins": []
+  }
+}

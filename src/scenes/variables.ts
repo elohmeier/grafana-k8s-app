@@ -1,0 +1,100 @@
+import {
+  CustomVariable,
+  DataSourceVariable,
+  QueryVariable,
+  SceneVariableSet,
+  type SceneVariable,
+} from '@grafana/scenes';
+import { VariableRefresh, VariableSort } from '@grafana/schema';
+import {
+  DEFAULT_ELASTICSEARCH_UID,
+  DEFAULT_INFRA_UID,
+  DEFAULT_PROMETHEUS_UID,
+  PROMETHEUS_REF,
+} from '../constants';
+
+export function getGlobalVariables(extraVariables: SceneVariable[] = []) {
+  return new SceneVariableSet({
+    variables: [
+      new DataSourceVariable({
+        name: 'datasource',
+        label: 'Metrics',
+        pluginId: 'prometheus',
+        value: DEFAULT_PROMETHEUS_UID,
+      }),
+      new DataSourceVariable({
+        name: 'elasticsearch',
+        label: 'Logs',
+        pluginId: 'elasticsearch',
+        value: DEFAULT_ELASTICSEARCH_UID,
+      }),
+      new CustomVariable({
+        name: 'infraDatasource',
+        label: 'Infra metadata',
+        query: `${DEFAULT_INFRA_UID} : optional rqlite infrastructure metadata`,
+        value: DEFAULT_INFRA_UID,
+      }),
+      new QueryVariable({
+        name: 'cluster',
+        label: 'Cluster',
+        datasource: PROMETHEUS_REF,
+        query: 'label_values(kube_node_info, cluster)',
+        value: '$__all',
+        includeAll: true,
+        isMulti: true,
+        allValue: '.*',
+        refresh: VariableRefresh.onDashboardLoad,
+        sort: VariableSort.alphabeticalAsc,
+      }),
+      new QueryVariable({
+        name: 'namespace',
+        label: 'Namespace',
+        datasource: PROMETHEUS_REF,
+        query: 'label_values(kube_namespace_status_phase{cluster=~"${cluster:regex}"}, namespace)',
+        value: '$__all',
+        includeAll: true,
+        isMulti: true,
+        allValue: '.*',
+        refresh: VariableRefresh.onDashboardLoad,
+        sort: VariableSort.alphabeticalAsc,
+      }),
+      new QueryVariable({
+        name: 'severity',
+        label: 'Severity',
+        datasource: PROMETHEUS_REF,
+        query: 'label_values(ALERTS{cluster=~"${cluster:regex}", namespace=~"${namespace:regex}"}, severity)',
+        value: '$__all',
+        includeAll: true,
+        isMulti: true,
+        allValue: '.*',
+        refresh: VariableRefresh.onDashboardLoad,
+        sort: VariableSort.alphabeticalAsc,
+      }),
+      new QueryVariable({
+        name: 'alertname',
+        label: 'Alert',
+        datasource: PROMETHEUS_REF,
+        query: 'label_values(ALERTS{cluster=~"${cluster:regex}", namespace=~"${namespace:regex}", severity=~"${severity:regex}"}, alertname)',
+        value: '$__all',
+        includeAll: true,
+        isMulti: true,
+        allValue: '.*',
+        refresh: VariableRefresh.onDashboardLoad,
+        sort: VariableSort.alphabeticalAsc,
+      }),
+      new QueryVariable({
+        name: 'alertCategory',
+        label: 'Alert category',
+        datasource: PROMETHEUS_REF,
+        query: 'label_values(ALERTS{cluster=~"${cluster:regex}", namespace=~"${namespace:regex}", severity=~"${severity:regex}"}, category)',
+        value: '$__all',
+        includeAll: true,
+        isMulti: true,
+        allValue: '.*',
+        refresh: VariableRefresh.onDashboardLoad,
+        sort: VariableSort.alphabeticalAsc,
+      }),
+      ...extraVariables,
+    ],
+  });
+}
