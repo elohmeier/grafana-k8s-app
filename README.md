@@ -31,10 +31,11 @@ The local provisioning file uses generic datasource UIDs (`prometheus`, `prometh
 
 GitHub Actions builds the plugin on pushes, pull requests, and manual runs. The release workflow uses semantic-release on `main` to create version tags and GitHub releases from Conventional Commits. When a release is created, CI attaches a packaged plugin ZIP named `kubernetes-observability-app-<version>.zip` to the GitHub release.
 
-To run a packaged build locally, download the release ZIP and extract it in the repository root so the plugin directory exists at `kubernetes-observability-app`:
+To run a packaged build locally, download the release ZIP and extract it in the repository root so the plugin directory exists at `kubernetes-observability-app`. Use the exact ZIP version you want to run:
 
 ```bash
-unzip kubernetes-observability-app-*.zip
+rm -rf kubernetes-observability-app
+unzip kubernetes-observability-app-1.0.2.zip
 docker compose -f docker-compose.release.yaml up
 ```
 

@@ -33,8 +33,8 @@ services:
       - --storage.tsdb.retention.time=2h
     volumes:
       - type: bind
-        source: ./provisioning/prometheus/prometheus.yml
-        target: /etc/prometheus/prometheus.yml
+        source: ./provisioning/prometheus
+        target: /etc/prometheus
         read_only: true
         bind:
           create_host_path: false
