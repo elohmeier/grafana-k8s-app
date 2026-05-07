@@ -1,17 +1,6 @@
-import {
-  CustomVariable,
-  DataSourceVariable,
-  QueryVariable,
-  SceneVariableSet,
-  type SceneVariable,
-} from '@grafana/scenes';
+import { DataSourceVariable, QueryVariable, SceneVariableSet, type SceneVariable } from '@grafana/scenes';
 import { VariableRefresh, VariableSort } from '@grafana/schema';
-import {
-  DEFAULT_ELASTICSEARCH_UID,
-  DEFAULT_INFRA_UID,
-  DEFAULT_PROMETHEUS_UID,
-  PROMETHEUS_REF,
-} from '../constants';
+import { DEFAULT_ELASTICSEARCH_UID, DEFAULT_INFRA_UID, DEFAULT_PROMETHEUS_UID, PROMETHEUS_REF } from '../constants';
 
 export function getGlobalVariables(extraVariables: SceneVariable[] = []) {
   return new SceneVariableSet({
@@ -28,10 +17,10 @@ export function getGlobalVariables(extraVariables: SceneVariable[] = []) {
         pluginId: 'elasticsearch',
         value: DEFAULT_ELASTICSEARCH_UID,
       }),
-      new CustomVariable({
+      new DataSourceVariable({
         name: 'infraDatasource',
         label: 'Infra metadata',
-        query: `${DEFAULT_INFRA_UID} : optional rqlite infrastructure metadata`,
+        pluginId: 'g42-rqlite-datasource',
         value: DEFAULT_INFRA_UID,
       }),
       new QueryVariable({
@@ -74,7 +63,8 @@ export function getGlobalVariables(extraVariables: SceneVariable[] = []) {
         name: 'alertname',
         label: 'Alert',
         datasource: PROMETHEUS_REF,
-        query: 'label_values(ALERTS{cluster=~"${cluster:regex}", namespace=~"${namespace:regex}", severity=~"${severity:regex}"}, alertname)',
+        query:
+          'label_values(ALERTS{cluster=~"${cluster:regex}", namespace=~"${namespace:regex}", severity=~"${severity:regex}"}, alertname)',
         value: '$__all',
         includeAll: true,
         isMulti: true,
@@ -86,7 +76,8 @@ export function getGlobalVariables(extraVariables: SceneVariable[] = []) {
         name: 'alertCategory',
         label: 'Alert category',
         datasource: PROMETHEUS_REF,
-        query: 'label_values(ALERTS{cluster=~"${cluster:regex}", namespace=~"${namespace:regex}", severity=~"${severity:regex}"}, category)',
+        query:
+          'label_values(ALERTS{cluster=~"${cluster:regex}", namespace=~"${namespace:regex}", severity=~"${severity:regex}"}, category)',
         value: '$__all',
         includeAll: true,
         isMulti: true,
