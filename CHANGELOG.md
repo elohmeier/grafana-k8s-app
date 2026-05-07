@@ -1,3 +1,10 @@
+## [1.0.6](https://github.com/elohmeier/grafana-k8s-app/compare/v1.0.5...v1.0.6) (2026-05-07)
+
+
+### Bug Fixes
+
+* scope scene variable selectors ([dabd308](https://github.com/elohmeier/grafana-k8s-app/commit/dabd308d237495704d679e5929c4bff3b8426dc0))
+
 ## [1.0.5](https://github.com/elohmeier/grafana-k8s-app/compare/v1.0.4...v1.0.5) (2026-05-07)
 
 
