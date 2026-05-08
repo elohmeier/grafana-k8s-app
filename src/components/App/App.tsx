@@ -2,6 +2,7 @@ import React from 'react';
 import { AppRootProps } from '@grafana/data';
 import { SceneApp, useSceneApp } from '@grafana/scenes';
 import { PluginPropsContext } from '../../utils/utils.plugin';
+import { setAppJsonData, type AppJsonData } from '../../utils/appJsonData';
 import { getAlertsPage } from '../../pages/Alerts/alertsPage';
 import { getClustersPage } from '../../pages/Clusters/clustersPage';
 import { getConfigurationPage } from '../../pages/Configuration/configurationPage';
@@ -48,7 +49,8 @@ function AppWithScenes() {
   return <scene.Component model={scene} />;
 }
 
-function App(props: AppRootProps) {
+function App(props: AppRootProps<AppJsonData>) {
+  setAppJsonData(props.meta.jsonData);
   return (
     <PluginPropsContext.Provider value={props}>
       <AppWithScenes />

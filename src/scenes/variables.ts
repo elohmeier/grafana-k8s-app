@@ -1,27 +1,29 @@
 import { DataSourceVariable, QueryVariable, SceneVariableSet, type SceneVariable } from '@grafana/scenes';
 import { VariableRefresh, VariableSort } from '@grafana/schema';
-import { DEFAULT_ELASTICSEARCH_UID, DEFAULT_INFRA_UID, DEFAULT_PROMETHEUS_UID, PROMETHEUS_REF } from '../constants';
+import { PROMETHEUS_REF } from '../constants';
+import { getDatasourceDefaults } from '../utils/appJsonData';
 
 export function getGlobalVariables(extraVariables: SceneVariable[] = []) {
+  const defaults = getDatasourceDefaults();
   return new SceneVariableSet({
     variables: [
       new DataSourceVariable({
         name: 'datasource',
         label: 'Metrics',
         pluginId: 'prometheus',
-        value: DEFAULT_PROMETHEUS_UID,
+        value: defaults.prometheusUid,
       }),
       new DataSourceVariable({
         name: 'elasticsearch',
         label: 'Logs',
         pluginId: 'elasticsearch',
-        value: DEFAULT_ELASTICSEARCH_UID,
+        value: defaults.elasticsearchUid,
       }),
       new DataSourceVariable({
         name: 'infraDatasource',
         label: 'Infra metadata',
         pluginId: 'g42-rqlite-datasource',
-        value: DEFAULT_INFRA_UID,
+        value: defaults.infraUid,
       }),
       new QueryVariable({
         name: 'cluster',

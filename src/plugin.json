@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
   "type": "app",
-  "name": "Kubernetes Observability",
+  "name": "Kubernetes",
   "id": "kubernetes-observability-app",
   "info": {
     "keywords": ["kubernetes", "openshift", "prometheus", "thanos"],

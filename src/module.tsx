@@ -3,6 +3,7 @@ import { initPluginTranslations } from '@grafana/i18n';
 import { AppPlugin, type AppRootProps } from '@grafana/data';
 import { LoadingPlaceholder } from '@grafana/ui';
 import type { AppConfigProps } from './components/AppConfig/AppConfig';
+import type { AppJsonData } from './utils/appJsonData';
 import pluginJson from 'plugin.json';
 
 await initPluginTranslations(pluginJson.id);
@@ -22,7 +23,7 @@ const AppConfig = (props: AppConfigProps) => (
   </Suspense>
 );
 
-export const plugin = new AppPlugin<{}>().setRootPage(App).addConfigPage({
+export const plugin = new AppPlugin<AppJsonData>().setRootPage(App).addConfigPage({
   title: 'Configuration',
   icon: 'cog',
   body: AppConfig,
