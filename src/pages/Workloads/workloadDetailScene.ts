@@ -1,5 +1,12 @@
 import { DETAIL_ALERT_CONTROLS, full, item, pageScene, row } from '../../scenes/common';
-import { linkedTablePanel, ratioTimeseriesPanel, tablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
+import {
+  linkedTablePanel,
+  overRequestRatioTimeseriesPanel,
+  ratioTimeseriesPanel,
+  tablePanel,
+  timeseriesPanel,
+  warningStatPanel,
+} from '../../scenes/panels';
 import { alertCountQuery, alertInventoryQuery } from '../../queries/alerts';
 import { podInventoryQuery } from '../../queries/entity';
 import { podPhases } from '../../queries/prometheus';
@@ -29,8 +36,8 @@ export function workloadDetailScene(cluster: string, namespace: string, workload
       ),
       row(
         [
-          item(ratioTimeseriesPanel('CPU usage / requests', cpuUsageToRequests(scope)), '33%', 280),
-          item(ratioTimeseriesPanel('Memory usage / requests', memoryUsageToRequests(scope)), '33%', 280),
+          item(overRequestRatioTimeseriesPanel('CPU usage / requests', cpuUsageToRequests(scope)), '33%', 280),
+          item(overRequestRatioTimeseriesPanel('Memory usage / requests', memoryUsageToRequests(scope)), '33%', 280),
           item(ratioTimeseriesPanel('PVC used ratio', scopedPersistentVolumeUsageQuery(scope)), '34%', 280),
         ],
         300

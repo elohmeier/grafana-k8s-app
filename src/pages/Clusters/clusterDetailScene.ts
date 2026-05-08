@@ -1,5 +1,11 @@
 import { DETAIL_ALERT_CONTROLS, full, item, pageScene, row } from '../../scenes/common';
-import { linkedTablePanel, ratioTimeseriesPanel, tablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
+import {
+  linkedTablePanel,
+  overRequestRatioTimeseriesPanel,
+  tablePanel,
+  timeseriesPanel,
+  warningStatPanel,
+} from '../../scenes/panels';
 import { alertCountQuery, alertInventoryQuery } from '../../queries/alerts';
 import {
   namespaceInventoryQuery,
@@ -34,8 +40,8 @@ export function clusterDetailScene(cluster: string) {
       ),
       row(
         [
-          item(ratioTimeseriesPanel('CPU usage / requests', cpuUsageToRequests(scope)), '33%', 280),
-          item(ratioTimeseriesPanel('Memory usage / requests', memoryUsageToRequests(scope)), '33%', 280),
+          item(overRequestRatioTimeseriesPanel('CPU usage / requests', cpuUsageToRequests(scope)), '33%', 280),
+          item(overRequestRatioTimeseriesPanel('Memory usage / requests', memoryUsageToRequests(scope)), '33%', 280),
           item(tablePanel('PVC risks', scopedPersistentVolumeRiskQuery(scope)), '34%', 280),
         ],
         300

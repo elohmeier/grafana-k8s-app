@@ -1,5 +1,5 @@
 import { CLUSTER_ALERT_CONTROLS, full, item, pageScene, row } from '../../scenes/common';
-import { linkedTablePanel, ratioTimeseriesPanel, topTablePanel, timeseriesPanel } from '../../scenes/panels';
+import { linkedTablePanel, overRequestRatioTimeseriesPanel, topTablePanel, timeseriesPanel } from '../../scenes/panels';
 import { clusterInventoryQuery } from '../../queries/entity';
 import { clusterCpuUsage, clusterMemoryWorkingSet, nodeConditions } from '../../queries/prometheus';
 import { clusterLink, nodeLink } from '../../utils/entityLinks';
@@ -36,9 +36,9 @@ export function clustersScene() {
       ),
       row(
         [
-          item(ratioTimeseriesPanel('CPU usage / requests by cluster', cpuUsageToRequests()), '33%', 260),
+          item(overRequestRatioTimeseriesPanel('CPU usage / requests by cluster', cpuUsageToRequests()), '33%', 260),
           item(
-            ratioTimeseriesPanel('Memory usage / requests by cluster', memoryUsageToRequests()),
+            overRequestRatioTimeseriesPanel('Memory usage / requests by cluster', memoryUsageToRequests()),
             '33%',
             260
           ),

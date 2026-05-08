@@ -4,7 +4,13 @@ import { podInventoryQuery, workloadInventoryQuery } from '../../queries/entity'
 import { namespaceQuota, podPhases } from '../../queries/prometheus';
 import { cpuUsage, cpuUsageToRequests, memoryUsageToRequests, memoryWorkingSet } from '../../queries/resources';
 import { scopedPersistentVolumeRiskQuery } from '../../queries/storage';
-import { linkedTablePanel, ratioTimeseriesPanel, tablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
+import {
+  linkedTablePanel,
+  overRequestRatioTimeseriesPanel,
+  tablePanel,
+  timeseriesPanel,
+  warningStatPanel,
+} from '../../scenes/panels';
 import { podLink, workloadLink } from '../../utils/entityLinks';
 
 export function namespaceDetailScene(cluster: string, namespace: string) {
@@ -29,8 +35,8 @@ export function namespaceDetailScene(cluster: string, namespace: string) {
       ),
       row(
         [
-          item(ratioTimeseriesPanel('CPU usage / requests', cpuUsageToRequests(scope)), '33%', 280),
-          item(ratioTimeseriesPanel('Memory usage / requests', memoryUsageToRequests(scope)), '33%', 280),
+          item(overRequestRatioTimeseriesPanel('CPU usage / requests', cpuUsageToRequests(scope)), '33%', 280),
+          item(overRequestRatioTimeseriesPanel('Memory usage / requests', memoryUsageToRequests(scope)), '33%', 280),
           item(tablePanel('PVC risks', scopedPersistentVolumeRiskQuery(scope)), '34%', 280),
         ],
         300

@@ -13,6 +13,7 @@ import {
   elasticsearchTablePanel,
   infraTablePanel,
   linkedTablePanel,
+  overRequestRatioTimeseriesPanel,
   tablePanel,
   timeseriesPanel,
 } from '../../scenes/panels';
@@ -161,15 +162,15 @@ export function resourcesScene(scope: EntityScope) {
       ),
       row(
         [
-          item(timeseriesPanel('CPU usage / requests', cpuUsageToRequests(scope), 'percentunit'), '50%', 300),
-          item(timeseriesPanel('Memory usage / requests', memoryUsageToRequests(scope), 'percentunit'), '50%', 300),
+          item(overRequestRatioTimeseriesPanel('CPU usage / requests', cpuUsageToRequests(scope)), '50%', 300),
+          item(overRequestRatioTimeseriesPanel('Memory usage / requests', memoryUsageToRequests(scope)), '50%', 300),
         ],
         320
       ),
       row(
         [
-          item(timeseriesPanel('CPU usage / limits', cpuUsageToLimits(scope), 'percentunit'), '50%', 300),
-          item(timeseriesPanel('Memory usage / limits', memoryUsageToLimits(scope), 'percentunit'), '50%', 300),
+          item(overRequestRatioTimeseriesPanel('CPU usage / limits', cpuUsageToLimits(scope)), '50%', 300),
+          item(overRequestRatioTimeseriesPanel('Memory usage / limits', memoryUsageToLimits(scope)), '50%', 300),
         ],
         320
       ),
@@ -244,10 +245,10 @@ export function cpuScene(scope: EntityScope) {
       ),
       row(
         [
-          item(timeseriesPanel('CPU usage / requests', cpuUsageToRequests(scope), 'percentunit'), '25%', 280),
-          item(timeseriesPanel('CPU usage / limits', cpuUsageToLimits(scope), 'percentunit'), '25%', 280),
+          item(overRequestRatioTimeseriesPanel('CPU usage / requests', cpuUsageToRequests(scope)), '25%', 280),
+          item(overRequestRatioTimeseriesPanel('CPU usage / limits', cpuUsageToLimits(scope)), '25%', 280),
           item(timeseriesPanel('CPU requests / limits', cpuRequestsToLimits(scope), 'percentunit'), '25%', 280),
-          item(timeseriesPanel('CPU p95 / requests', cpuUsageP95ToRequests(scope), 'percentunit'), '25%', 280),
+          item(overRequestRatioTimeseriesPanel('CPU p95 / requests', cpuUsageP95ToRequests(scope)), '25%', 280),
         ],
         300
       ),
@@ -286,11 +287,11 @@ export function memoryScene(scope: EntityScope) {
       ),
       row(
         [
-          item(timeseriesPanel('Memory usage / requests', memoryUsageToRequests(scope), 'percentunit'), '25%', 280),
-          item(timeseriesPanel('Memory usage / limits', memoryUsageToLimits(scope), 'percentunit'), '25%', 280),
+          item(overRequestRatioTimeseriesPanel('Memory usage / requests', memoryUsageToRequests(scope)), '25%', 280),
+          item(overRequestRatioTimeseriesPanel('Memory usage / limits', memoryUsageToLimits(scope)), '25%', 280),
           item(timeseriesPanel('Memory requests / limits', memoryRequestsToLimits(scope), 'percentunit'), '25%', 280),
           item(
-            timeseriesPanel('Memory p95 / requests', memoryWorkingSetP95ToRequests(scope), 'percentunit'),
+            overRequestRatioTimeseriesPanel('Memory p95 / requests', memoryWorkingSetP95ToRequests(scope)),
             '25%',
             280
           ),

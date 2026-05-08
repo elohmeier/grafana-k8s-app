@@ -1,7 +1,7 @@
 import { full, item, pageScene, row } from '../../scenes/common';
 import { linkedTablePanel, topTablePanel, timeseriesPanel, warningStatPanel } from '../../scenes/panels';
 import { podInventoryQuery } from '../../queries/entity';
-import { pendingPods, podsNotReady, restartHotspots } from '../../queries/health';
+import { pendingPods, podsNotReady, restartHotspots, restartHotspotTrend } from '../../queries/health';
 import { podLink } from '../../utils/entityLinks';
 
 export function podsScene() {
@@ -41,7 +41,7 @@ export function podsScene() {
     full(
       timeseriesPanel(
         'Pod restarts',
-        'sum by (cluster, namespace, pod) (increase(kube_pod_container_status_restarts_total{cluster=~"${cluster:regex}", namespace=~"${namespace:regex}"}[$__range]))'
+        restartHotspotTrend()
       ),
       300
     ),

@@ -70,6 +70,14 @@ function percentThresholds() {
   ]);
 }
 
+function overRequestThresholds() {
+  return absoluteThresholds([
+    { color: 'green', value: -Infinity },
+    { color: 'yellow', value: 0.8 },
+    { color: 'red', value: 1 },
+  ]);
+}
+
 export function legendFromPromQuery(expr: string) {
   const normalizedExpr = expr.replace(/\$\{[^}]+\}/g, '$var');
   const byMatches = Array.from(normalizedExpr.matchAll(/\bby\s*\(([^)]+)\)/g));
@@ -228,6 +236,19 @@ export function ratioTimeseriesPanel(title: string, expr: string) {
     .setMin(0)
     .setMax(1)
     .setThresholds(percentThresholds())
+    .setColor({ mode: FieldColorModeId.PaletteClassic })
+    .build();
+}
+
+export function overRequestRatioTimeseriesPanel(title: string, expr: string) {
+  return PanelBuilders.timeseries()
+    .setTitle(title)
+    .setData(promRunner(expr, 'A', { legendFormat: legendFromPromQuery(expr) }))
+    .setNoValue('-')
+    .setUnit('percentunit')
+    .setDecimals(2)
+    .setMin(0)
+    .setThresholds(overRequestThresholds())
     .setColor({ mode: FieldColorModeId.PaletteClassic })
     .build();
 }

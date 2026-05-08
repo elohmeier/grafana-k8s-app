@@ -1,15 +1,19 @@
 import { GLOBAL_ALERT_CONTROLS, full, item, pageScene, row } from '../../scenes/common';
 import { alertInventoryQuery, alertsByWorkloadQuery } from '../../queries/alerts';
 import { workloadInventoryQuery } from '../../queries/entity';
-import { linkedTablePanel, ratioTimeseriesPanel, tablePanel, topTablePanel, timeseriesPanel } from '../../scenes/panels';
+import { linkedTablePanel, overRequestRatioTimeseriesPanel, tablePanel, topTablePanel, timeseriesPanel } from '../../scenes/panels';
 import { workloadLink } from '../../utils/entityLinks';
 import {
-  cpuUsageToRequests,
-  memoryUsageToRequests,
+  topCpuOverRequests,
   topCpuConsumers,
-  topCpuUsageToRequests,
+  topCpuRequestPressure,
+  topCpuRequestPressureTrend,
+  topMemoryOverRequests,
   topMemoryConsumers,
-  topMemoryUsageToRequests,
+  topMemoryRequestPressure,
+  topMemoryRequestPressureTrend,
+  weightedCpuUsageToRequests,
+  weightedMemoryUsageToRequests,
 } from '../../queries/resources';
 
 export function workloadsScene() {
@@ -25,14 +29,14 @@ export function workloadsScene() {
             280
           ),
           item(
-            topTablePanel('CPU over requests', topCpuUsageToRequests({ workload: '.+' }), 'percentunit', [workloadLink()]),
+            topTablePanel('CPU request pressure', topCpuRequestPressure({ workload: '.+' }), 'percentunit', [workloadLink()]),
             '25%',
             280
           ),
           item(
             topTablePanel(
-              'Memory over requests',
-              topMemoryUsageToRequests({ workload: '.+' }),
+              'Memory request pressure',
+              topMemoryRequestPressure({ workload: '.+' }),
               'percentunit',
               [workloadLink()]
             ),
@@ -44,9 +48,46 @@ export function workloadsScene() {
       ),
       row(
         [
-          item(ratioTimeseriesPanel('CPU usage / requests by workload', cpuUsageToRequests({ workload: '.+' })), '50%', 280),
           item(
-            ratioTimeseriesPanel('Memory usage / requests by workload', memoryUsageToRequests({ workload: '.+' })),
+            overRequestRatioTimeseriesPanel(
+              'Top CPU usage / requests by workload',
+              topCpuRequestPressureTrend({ workload: '.+' })
+            ),
+            '25%',
+            280
+          ),
+          item(
+            overRequestRatioTimeseriesPanel(
+              'Top memory usage / requests by workload',
+              topMemoryRequestPressureTrend({ workload: '.+' })
+            ),
+            '25%',
+            280
+          ),
+          item(
+            overRequestRatioTimeseriesPanel(
+              'Weighted CPU usage / requests by cluster',
+              weightedCpuUsageToRequests({ workload: '.+' })
+            ),
+            '25%',
+            280
+          ),
+          item(
+            overRequestRatioTimeseriesPanel(
+              'Weighted memory usage / requests by cluster',
+              weightedMemoryUsageToRequests({ workload: '.+' })
+            ),
+            '25%',
+            280
+          ),
+        ],
+        300
+      ),
+      row(
+        [
+          item(topTablePanel('CPU over requests', topCpuOverRequests({ workload: '.+' }), 'cores', [workloadLink()]), '50%', 280),
+          item(
+            topTablePanel('Memory over requests', topMemoryOverRequests({ workload: '.+' }), 'bytes', [workloadLink()]),
             '50%',
             280
           ),

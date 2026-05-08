@@ -54,6 +54,49 @@ function resourceGroupLabels(scope: EntityScope = {}) {
   return 'cluster, namespace';
 }
 
+function labelList(scope: EntityScope = {}) {
+  return resourceGroupLabels(scope)
+    .split(',')
+    .map((label) => label.trim())
+    .filter(Boolean);
+}
+
+function promOnLabels(scope: EntityScope = {}) {
+  return labelList(scope).join(', ');
+}
+
+function clusterAggregateLabels(scope: EntityScope = {}) {
+  return scope.cluster ? 'cluster' : 'cluster';
+}
+
+function stableTopByRangeMax(expr: string, scope: EntityScope = {}, limit = 10, minDenominatorExpr?: string) {
+  const labels = promOnLabels(scope);
+  const denominatorFilter = minDenominatorExpr ? `and on (${labels}) (${minDenominatorExpr})` : '';
+
+  return `
+(${expr.trim()})
+and on (${labels})
+topk(${limit},
+  max_over_time((${expr.trim()})[$__range:])
+  ${denominatorFilter}
+)
+`;
+}
+
+function stableTopByRangeP95(expr: string, scope: EntityScope = {}, limit = 10, minDenominatorExpr?: string) {
+  const labels = promOnLabels(scope);
+  const denominatorFilter = minDenominatorExpr ? `and on (${labels}) (${minDenominatorExpr})` : '';
+
+  return `
+(${expr.trim()})
+and on (${labels})
+topk(${limit},
+  quantile_over_time(0.95, (${expr.trim()})[$__range:])
+  ${denominatorFilter}
+)
+`;
+}
+
 function classicMetric(metric: string, scope: EntityScope = {}, extraMatchers = '') {
   const filters = [podScopedMatchers(scope), extraMatchers].filter(Boolean).join(', ');
 
@@ -187,6 +230,20 @@ sum by (${labels}) (
 `;
 }
 
+export function weightedCpuUsageToRequests(scope: EntityScope = {}) {
+  const labels = clusterAggregateLabels(scope);
+
+  return `
+sum by (${labels}) (
+  ${containerUsageSeries('container_cpu_usage_seconds_total', scope, '$__rate_interval')}
+)
+/
+sum by (${labels}) (
+  ${resourceSeries('kube_pod_container_resource_requests', 'cpu', scope)} > 0
+)
+`;
+}
+
 export function cpuUsageToLimits(scope: EntityScope = {}) {
   const labels = resourceGroupLabels(scope);
 
@@ -203,6 +260,20 @@ sum by (${labels}) (
 
 export function memoryUsageToRequests(scope: EntityScope = {}) {
   const labels = resourceGroupLabels(scope);
+
+  return `
+sum by (${labels}) (
+  ${containerUsageSeries('container_memory_working_set_bytes', scope)}
+)
+/
+sum by (${labels}) (
+  ${resourceSeries('kube_pod_container_resource_requests', 'memory', scope)} > 0
+)
+`;
+}
+
+export function weightedMemoryUsageToRequests(scope: EntityScope = {}) {
+  const labels = clusterAggregateLabels(scope);
 
   return `
 sum by (${labels}) (
@@ -361,6 +432,14 @@ topk(10, ${memoryWorkingSet(scope).trim()})
 `;
 }
 
+export function topCpuConsumersTrend(scope: EntityScope = {}, limit = 10) {
+  return stableTopByRangeMax(cpuUsage(scope), scope, limit);
+}
+
+export function topMemoryConsumersTrend(scope: EntityScope = {}, limit = 10) {
+  return stableTopByRangeMax(memoryWorkingSet(scope), scope, limit);
+}
+
 export function topCpuUsageToRequests(scope: EntityScope = {}) {
   return `
 topk(10, ${cpuUsageToRequests(scope).trim()})
@@ -371,4 +450,100 @@ export function topMemoryUsageToRequests(scope: EntityScope = {}) {
   return `
 topk(10, ${memoryUsageToRequests(scope).trim()})
 `;
+}
+
+export function topCpuRequestPressure(scope: EntityScope = {}, limit = 10, minRequestedCores = 1) {
+  const labels = promOnLabels(scope);
+
+  return `
+sort_desc(topk(${limit},
+  ${cpuUsageP95ToRequests(scope).trim()}
+  and on (${labels}) (${cpuRequests(scope).trim()} > ${minRequestedCores})
+))
+`;
+}
+
+export function topMemoryRequestPressure(scope: EntityScope = {}, limit = 10, minRequestedBytes = 536870912) {
+  const labels = promOnLabels(scope);
+
+  return `
+sort_desc(topk(${limit},
+  ${memoryWorkingSetP95ToRequests(scope).trim()}
+  and on (${labels}) (${memoryRequests(scope).trim()} > ${minRequestedBytes})
+))
+`;
+}
+
+export function topCpuRequestPressureTrend(scope: EntityScope = {}, limit = 10, minRequestedCores = 1) {
+  return stableTopByRangeP95(
+    cpuUsageToRequests(scope),
+    scope,
+    limit,
+    `${cpuRequests(scope).trim()} > ${minRequestedCores}`
+  );
+}
+
+export function topMemoryRequestPressureTrend(scope: EntityScope = {}, limit = 10, minRequestedBytes = 536870912) {
+  return stableTopByRangeP95(
+    memoryUsageToRequests(scope),
+    scope,
+    limit,
+    `${memoryRequests(scope).trim()} > ${minRequestedBytes}`
+  );
+}
+
+export function topCpuOverRequests(scope: EntityScope = {}, limit = 10) {
+  return `
+sort_desc(topk(${limit},
+  clamp_min(
+    ${cpuUsage(scope).trim()}
+    -
+    ${cpuRequests(scope).trim()},
+    0
+  )
+))
+`;
+}
+
+export function topMemoryOverRequests(scope: EntityScope = {}, limit = 10) {
+  return `
+sort_desc(topk(${limit},
+  clamp_min(
+    ${memoryWorkingSet(scope).trim()}
+    -
+    ${memoryRequests(scope).trim()},
+    0
+  )
+))
+`;
+}
+
+export function topCpuOverRequestTrend(scope: EntityScope = {}, limit = 10) {
+  return stableTopByRangeMax(
+    `
+clamp_min(
+  ${cpuUsage(scope).trim()}
+  -
+  ${cpuRequests(scope).trim()},
+  0
+)
+`,
+    scope,
+    limit
+  );
+}
+
+export function topMemoryOverRequestTrend(scope: EntityScope = {}, limit = 10) {
+  return stableTopByRangeMax(
+    `
+clamp_min(
+  ${memoryWorkingSet(scope).trim()}
+  -
+  ${memoryRequests(scope).trim()},
+  0
+)
+`,
+    scope,
+    limit
+  );
 }

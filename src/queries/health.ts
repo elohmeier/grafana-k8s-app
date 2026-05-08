@@ -75,6 +75,22 @@ topk(10,
 `;
 }
 
+export function restartHotspotTrend(scope: EntityScope = {}) {
+  const expr = `
+sum by (cluster, namespace, pod) (
+  increase(kube_pod_container_status_restarts_total{${scopedMatchers(scope)}, namespace=~"${scope.namespace ?? NAMESPACE_FILTER}"}[$__rate_interval])
+)
+`;
+
+  return `
+(${expr.trim()})
+and on (cluster, namespace, pod)
+topk(10,
+  max_over_time((${expr.trim()})[$__range:])
+)
+`;
+}
+
 export function zeroReplicaDeployments(scope: EntityScope = {}) {
   return `
 label_replace(

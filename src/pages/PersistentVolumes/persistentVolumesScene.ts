@@ -1,6 +1,11 @@
 import { full, item, pageScene, row } from '../../scenes/common';
-import { ratioTimeseriesPanel, tablePanel, warningStatPanel } from '../../scenes/panels';
-import { persistentVolumeInventoryQuery, persistentVolumeRiskQuery, persistentVolumeUsageQuery } from '../../queries/storage';
+import { ratioTimeseriesPanel, tablePanel, topTablePanel, warningStatPanel } from '../../scenes/panels';
+import {
+  persistentVolumeInventoryQuery,
+  persistentVolumeRiskQuery,
+  topPersistentVolumeUsageQuery,
+  topPersistentVolumeUsageTrend,
+} from '../../queries/storage';
 
 export function persistentVolumesScene() {
   return pageScene([
@@ -11,7 +16,13 @@ export function persistentVolumesScene() {
       ],
       240
     ),
-    full(ratioTimeseriesPanel('PVC used ratio', persistentVolumeUsageQuery()), 320),
+    row(
+      [
+        item(ratioTimeseriesPanel('Top PVC used ratio', topPersistentVolumeUsageTrend()), '50%', 320),
+        item(topTablePanel('Top PVCs by used ratio', topPersistentVolumeUsageQuery(), 'percentunit'), '50%', 320),
+      ],
+      340
+    ),
     full(tablePanel('PV/PVC risks', persistentVolumeRiskQuery()), 320),
   ]);
 }

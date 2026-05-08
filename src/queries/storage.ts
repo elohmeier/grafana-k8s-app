@@ -81,6 +81,22 @@ max by (cluster, namespace, persistentvolumeclaim) (
 `;
 }
 
+export function topPersistentVolumeUsageQuery(limit = 10) {
+  return `
+sort_desc(topk(${limit}, ${persistentVolumeUsageQuery().trim()}))
+`;
+}
+
+export function topPersistentVolumeUsageTrend(limit = 10) {
+  return `
+(${persistentVolumeUsageQuery().trim()})
+and on (cluster, namespace, persistentvolumeclaim)
+topk(${limit},
+  max_over_time((${persistentVolumeUsageQuery().trim()})[$__range:])
+)
+`;
+}
+
 export function persistentVolumeRiskQuery() {
   return `
 (

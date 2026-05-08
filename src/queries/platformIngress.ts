@@ -180,11 +180,39 @@ avg by (cluster, tenant, service_instance_name, k8s_ingress_name) (
 `;
 }
 
+export function aviIngressHealthScoreByCluster(scope: EntityScope = {}) {
+  return `
+avg by (cluster) (
+  avi_healthscore_health_score_value{${scopedMatchers(scope)}, k8s_ingress_name!=""}
+)
+`;
+}
+
+export function aviLowestIngressHealth(scope: EntityScope = {}) {
+  return `
+bottomk(10, ${aviIngressHealthScore(scope).trim()})
+`;
+}
+
 export function aviIngressErrorPercent(scope: EntityScope = {}) {
   return `
 avg by (cluster, tenant, service_instance_name, k8s_ingress_name) (
   avi_l7_server_pct_response_errors{${scopedMatchers(scope)}, k8s_ingress_name!=""}
 )
+`;
+}
+
+export function aviIngressErrorPercentByCluster(scope: EntityScope = {}) {
+  return `
+avg by (cluster) (
+  avi_l7_server_pct_response_errors{${scopedMatchers(scope)}, k8s_ingress_name!=""}
+)
+`;
+}
+
+export function aviTopIngressErrorPercent(scope: EntityScope = {}) {
+  return `
+sort_desc(topk(10, ${aviIngressErrorPercent(scope).trim()}))
 `;
 }
 
@@ -196,11 +224,39 @@ avg by (cluster, tenant, service_instance_name, k8s_ingress_name) (
 `;
 }
 
+export function aviIngressResponseLatencyByCluster(scope: EntityScope = {}) {
+  return `
+avg by (cluster) (
+  avi_l7_server_avg_resp_latency{${scopedMatchers(scope)}, k8s_ingress_name!=""}
+)
+`;
+}
+
+export function aviTopIngressResponseLatency(scope: EntityScope = {}) {
+  return `
+sort_desc(topk(10, ${aviIngressResponseLatency(scope).trim()}))
+`;
+}
+
 export function aviIngressResponses(scope: EntityScope = {}) {
   return `
 sum by (cluster, tenant, service_instance_name, k8s_ingress_name) (
   avi_l7_client_sum_total_responses{${scopedMatchers(scope)}, k8s_ingress_name!=""}
 )
+`;
+}
+
+export function aviIngressResponsesByCluster(scope: EntityScope = {}) {
+  return `
+sum by (cluster) (
+  avi_l7_client_sum_total_responses{${scopedMatchers(scope)}, k8s_ingress_name!=""}
+)
+`;
+}
+
+export function aviTopIngressResponses(scope: EntityScope = {}) {
+  return `
+sort_desc(topk(10, ${aviIngressResponses(scope).trim()}))
 `;
 }
 
@@ -212,11 +268,39 @@ sum by (cluster, tenant, service_instance_name, k8s_ingress_name) (
 `;
 }
 
+export function aviIngressBandwidthByCluster(scope: EntityScope = {}) {
+  return `
+sum by (cluster) (
+  avi_l4_client_avg_bandwidth{${scopedMatchers(scope)}, k8s_ingress_name!=""}
+)
+`;
+}
+
+export function aviTopIngressBandwidth(scope: EntityScope = {}) {
+  return `
+sort_desc(topk(10, ${aviIngressBandwidth(scope).trim()}))
+`;
+}
+
 export function aviIngressDroppedConnections(scope: EntityScope = {}) {
   return `
 sum by (cluster, tenant, service_instance_name, k8s_ingress_name) (
   avi_l4_client_avg_connections_dropped{${scopedMatchers(scope)}, k8s_ingress_name!=""}
 )
+`;
+}
+
+export function aviIngressDroppedConnectionsByCluster(scope: EntityScope = {}) {
+  return `
+sum by (cluster) (
+  avi_l4_client_avg_connections_dropped{${scopedMatchers(scope)}, k8s_ingress_name!=""}
+)
+`;
+}
+
+export function aviTopIngressDroppedConnections(scope: EntityScope = {}) {
+  return `
+sort_desc(topk(10, ${aviIngressDroppedConnections(scope).trim()}))
 `;
 }
 

@@ -5,14 +5,20 @@ import {
   akoPutOperations,
   akoQueueDepth,
   akoRestOperations,
-  aviIngressBandwidth,
-  aviIngressDroppedConnections,
-  aviIngressErrorPercent,
-  aviIngressHealthScore,
-  aviIngressResponseLatency,
-  aviIngressResponses,
+  aviIngressBandwidthByCluster,
+  aviIngressDroppedConnectionsByCluster,
+  aviIngressErrorPercentByCluster,
+  aviIngressHealthScoreByCluster,
+  aviIngressResponseLatencyByCluster,
+  aviIngressResponsesByCluster,
+  aviLowestIngressHealth,
   aviLowestVirtualServiceHealth,
   aviServiceEngineHealth,
+  aviTopIngressBandwidth,
+  aviTopIngressDroppedConnections,
+  aviTopIngressErrorPercent,
+  aviTopIngressResponseLatency,
+  aviTopIngressResponses,
   aviTopVirtualServiceBandwidth,
   haproxyAdminSocketLatency,
   haproxyCertificateDaysRemaining,
@@ -83,17 +89,37 @@ export function platformIngressScene() {
       full(tablePanel('HAProxy certificate signing failures', haproxyCertificateSigningFailures()), 280),
       row(
         [
-          item(timeseriesPanel('AVI ingress health score', aviIngressHealthScore(), 'short'), '33%', 300),
-          item(timeseriesPanel('AVI ingress response error %', aviIngressErrorPercent(), 'percent'), '33%', 300),
-          item(timeseriesPanel('AVI ingress response latency', aviIngressResponseLatency(), 'ms'), '34%', 300),
+          item(timeseriesPanel('AVI ingress health score by cluster', aviIngressHealthScoreByCluster(), 'short'), '33%', 300),
+          item(timeseriesPanel('AVI ingress response error % by cluster', aviIngressErrorPercentByCluster(), 'percent'), '33%', 300),
+          item(timeseriesPanel('AVI ingress response latency by cluster', aviIngressResponseLatencyByCluster(), 'ms'), '34%', 300),
         ],
         320
       ),
       row(
         [
-          item(timeseriesPanel('AVI ingress responses', aviIngressResponses(), 'rps'), '33%', 300),
-          item(timeseriesPanel('AVI ingress bandwidth', aviIngressBandwidth(), 'Bps'), '33%', 300),
-          item(timeseriesPanel('AVI ingress dropped connections', aviIngressDroppedConnections(), 'cps'), '34%', 300),
+          item(timeseriesPanel('AVI ingress responses by cluster', aviIngressResponsesByCluster(), 'rps'), '33%', 300),
+          item(timeseriesPanel('AVI ingress bandwidth by cluster', aviIngressBandwidthByCluster(), 'Bps'), '33%', 300),
+          item(
+            timeseriesPanel('AVI ingress dropped connections by cluster', aviIngressDroppedConnectionsByCluster(), 'cps'),
+            '34%',
+            300
+          ),
+        ],
+        320
+      ),
+      row(
+        [
+          item(topTablePanel('Lowest AVI ingress health', aviLowestIngressHealth(), 'short'), '33%', 300),
+          item(topTablePanel('Top AVI ingress error %', aviTopIngressErrorPercent(), 'percent'), '33%', 300),
+          item(topTablePanel('Top AVI ingress latency', aviTopIngressResponseLatency(), 'ms'), '34%', 300),
+        ],
+        320
+      ),
+      row(
+        [
+          item(topTablePanel('Top AVI ingress responses', aviTopIngressResponses(), 'rps'), '33%', 300),
+          item(topTablePanel('Top AVI ingress bandwidth', aviTopIngressBandwidth(), 'Bps'), '33%', 300),
+          item(topTablePanel('Top AVI ingress dropped connections', aviTopIngressDroppedConnections(), 'cps'), '34%', 300),
         ],
         320
       ),
