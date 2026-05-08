@@ -114,5 +114,4 @@ jobs:
           gh release upload "v${{ needs.release.outputs.version }}" \
             "${{ steps.package.outputs.archive }}" \
             "${{ steps.package.outputs.sha1sum_file }}" \
-            docker-compose.release.yaml \
             --clobber
