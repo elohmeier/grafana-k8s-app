@@ -16,6 +16,7 @@ import {
   overRequestRatioTimeseriesPanel,
   tablePanel,
   timeseriesPanel,
+  topTablePanel,
 } from '../../scenes/panels';
 import {
   kubernetesEventsQuery,
@@ -69,6 +70,24 @@ import {
   networkTransmit,
   networkTransmitPackets,
 } from '../../queries/network';
+import {
+  aviRoute2xxResponses,
+  aviRoute4xxResponses,
+  aviRoute5xxResponses,
+  aviRouteHealthScore,
+  aviRouteResponseLatency,
+  httpAverageResponseLatency,
+  httpBackendServers,
+  httpErrorRate,
+  httpErrorRatio,
+  httpIncomingBytes,
+  httpOutgoingBytes,
+  httpRequestRate,
+  httpResponsesByCode,
+  httpRoutesByTraffic,
+  openshiftRoutes,
+  relatedAkoHostRules,
+} from '../../queries/platformIngress';
 import { namespaceEgressIpQuery, namespaceInfrastructureQuery, namespaceOwnershipQuery } from '../../queries/infra';
 import { alertInventoryQuery, globalAlertInventoryQuery } from '../../queries/alerts';
 import {
@@ -371,6 +390,62 @@ export function networkScene(scope: EntityScope) {
         [
           item(timeseriesPanel('Packet drops', networkDrops(scope), 'pps'), '50%', 300),
           item(timeseriesPanel('Network errors', networkErrors(scope), 'pps'), '50%', 300),
+        ],
+        320
+      ),
+    ],
+    'now-1h',
+    [],
+    METRICS_CONTROLS
+  );
+}
+
+export function httpScene(scope: EntityScope) {
+  return pageScene(
+    [
+      row(
+        [
+          item(timeseriesPanel('HTTP request rate', httpRequestRate(scope), 'reqps'), '25%', 260),
+          item(timeseriesPanel('HTTP error rate', httpErrorRate(scope), 'reqps'), '25%', 260),
+          item(timeseriesPanel('HTTP error ratio', httpErrorRatio(scope), 'percentunit'), '25%', 260),
+          item(timeseriesPanel('HTTP response latency', httpAverageResponseLatency(scope), 'ms'), '25%', 260),
+        ],
+        280
+      ),
+      row(
+        [
+          item(timeseriesPanel('HTTP incoming bandwidth', httpIncomingBytes(scope), 'Bps'), '50%', 300),
+          item(timeseriesPanel('HTTP outgoing bandwidth', httpOutgoingBytes(scope), 'Bps'), '50%', 300),
+        ],
+        320
+      ),
+      row(
+        [
+          item(topTablePanel('Routes by traffic', httpRoutesByTraffic(scope), 'Bps'), '50%', 320),
+          item(tablePanel('Responses by class', httpResponsesByCode(scope)), '50%', 320),
+        ],
+        340
+      ),
+      full(tablePanel('Backend servers', httpBackendServers(scope)), 320),
+      row(
+        [
+          item(tablePanel('OpenShift routes', openshiftRoutes(scope)), '50%', 320),
+          item(tablePanel('Related AKO HostRules', relatedAkoHostRules(scope)), '50%', 320),
+        ],
+        340
+      ),
+      row(
+        [
+          item(tablePanel('Related AVI route health', aviRouteHealthScore(scope)), '50%', 320),
+          item(timeseriesPanel('Related AVI response latency', aviRouteResponseLatency(scope), 'ms'), '50%', 320),
+        ],
+        340
+      ),
+      row(
+        [
+          item(timeseriesPanel('Related AVI 2xx responses', aviRoute2xxResponses(scope), 'rps'), '33%', 300),
+          item(timeseriesPanel('Related AVI 4xx responses', aviRoute4xxResponses(scope), 'rps'), '33%', 300),
+          item(timeseriesPanel('Related AVI 5xx responses', aviRoute5xxResponses(scope), 'rps'), '34%', 300),
         ],
         320
       ),

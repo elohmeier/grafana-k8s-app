@@ -5,6 +5,16 @@ import { kubernetesEventsQuery, kubernetesLogsQuery, kubernetesWarningsAndErrors
 import { networkErrors, networkReceive, networkReceivePackets, networkTransmit } from './network';
 import { kubeletPodStartDurationP95, nodeFilesystemUtilization } from './node';
 import { coreDnsErrorRate, ovnCniRequestLatencyP95, ovnDaemonSetAvailability } from './platformNetworking';
+import {
+  httpBackendServers,
+  httpRequestRate,
+  httpRoutesByTraffic,
+  aviRoute2xxResponses,
+  netscalerTopologyEdges,
+  netscalerTopologyNodes,
+  openshiftRoutes,
+  relatedAkoHostRules,
+} from './platformIngress';
 import { cpuRequests, cpuRequestsToCapacity, cpuUsage, cpuUsageP95, cpuUsageToRequests, memoryWorkingSet, topCpuConsumers } from './resources';
 import { deploymentReadiness, podWaitingReasons } from './scheduling';
 import {
@@ -238,6 +248,53 @@ describe('platform networking query builders', () => {
     expect(ovnLatencyQuery).toContain('ovnkube_node_cni_request_duration_seconds_bucket');
     expect(dnsQuery).toContain('coredns_dns_responses_total');
     expect(`${ovnAvailabilityQuery} ${ovnLatencyQuery} ${dnsQuery}`).not.toMatch(/loki|influx/i);
+  });
+});
+
+describe('ingress and HTTP query builders', () => {
+  it('scopes namespace and pod HTTP metrics through HAProxy exported labels', () => {
+    const namespaceQuery = compact(httpRequestRate({ cluster: 'c1', namespace: 'ns1' }));
+    const podQuery = compact(httpBackendServers({ cluster: 'c1', namespace: 'ns1', pod: 'pod-a' }));
+
+    expect(namespaceQuery).toContain('cluster=~"c1"');
+    expect(namespaceQuery).toContain('exported_namespace=~"ns1"');
+    expect(namespaceQuery).not.toMatch(/haproxy_server_http_responses_total\{[^}]*[, ]namespace=~"ns1"/);
+    expect(podQuery).toContain('exported_pod=~"pod-a"');
+  });
+
+  it('scopes workload HTTP metrics by joining exported pod labels to workload owners', () => {
+    const query = compact(
+      httpRoutesByTraffic({ cluster: 'c1', namespace: 'ns1', workload: 'checkout', workloadType: 'deployment' })
+    );
+
+    expect(query).toContain('label_replace');
+    expect(query).toContain('"namespace", "$1", "exported_namespace"');
+    expect(query).toContain('"pod", "$1", "exported_pod"');
+    expect(query).toContain('namespace_workload_pod:kube_pod_owner:relabel');
+    expect(query).toContain('workload=~"checkout"');
+    expect(query).toContain('workload_type=~"deployment"');
+    expect(query).not.toMatch(/haproxy_server_bytes_in_total\{[^}]*workload=/);
+  });
+
+  it('builds bounded route, AKO, and NetScaler helper queries', () => {
+    expect(compact(openshiftRoutes({ cluster: 'c1', namespace: 'ns1' }))).toContain('openshift_route_info');
+    expect(compact(openshiftRoutes({ cluster: 'c1', namespace: 'ns1' }))).toContain('namespace=~"ns1"');
+    expect(compact(relatedAkoHostRules({ cluster: 'c1' }))).toContain('max by (cluster, exported_namespace, fqdn, name, status)');
+    expect(netscalerTopologyNodes()).toContain('netscaler_topology_node');
+    expect(netscalerTopologyEdges()).toContain('netscaler_topology_edge');
+  });
+
+  it('correlates AVI server addresses back to OpenShift routes by host', () => {
+    const query = compact(aviRoute2xxResponses({ cluster: 'c1', namespace: 'ns1', workload: 'checkout' }));
+
+    expect(query).toContain('avi_l7_client_avg_resp_2xx');
+    expect(query).toContain('"host", "$1", "server_address"');
+    expect(query).toContain('openshift_route_info');
+    expect(query).toContain('cluster=~"c1"');
+    expect(query).toContain('namespace=~"ns1"');
+    expect(query).toContain('to_name=~"checkout"');
+    expect(query).toContain('group_left(ocp_cluster, ocp_namespace, ocp_route, ocp_service)');
+    expect(query).toContain('"avi_cluster", "$1", "cluster"');
   });
 });
 

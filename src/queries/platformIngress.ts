@@ -1,4 +1,126 @@
-import { EntityScope, scopedMatchers } from './prometheus';
+import { EntityScope, joinMatchers, matcher, scopedMatchers } from './prometheus';
+
+function ingressClusterMatcher(scope: EntityScope = {}) {
+  return matcher('cluster', scope.cluster ?? '${cluster:regex}');
+}
+
+function ingressRouteMatchers(scope: EntityScope = {}) {
+  return joinMatchers(
+    ingressClusterMatcher(scope),
+    matcher('exported_namespace', scope.namespace),
+    matcher('exported_pod', scope.pod)
+  );
+}
+
+function workloadOwnerMatch(scope: EntityScope) {
+  return scopedMatchers({
+    cluster: scope.cluster,
+    namespace: scope.namespace,
+    workload: scope.workload,
+    workloadType: scope.workloadType,
+  });
+}
+
+function scopedIngressRate(metric: string, scope: EntityScope = {}, extraMatchers = '') {
+  const directMatchers = joinMatchers(ingressRouteMatchers(scope), 'route!=""', extraMatchers);
+
+  if (!scope.workload) {
+    return `rate(${metric}{${directMatchers}}[$__rate_interval])`;
+  }
+
+  const workloadMetricMatchers = joinMatchers(
+    ingressClusterMatcher(scope),
+    'exported_namespace!=""',
+    'exported_pod!=""',
+    'route!=""',
+    extraMatchers
+  );
+
+  return `
+label_replace(
+  label_replace(
+    rate(${metric}{${workloadMetricMatchers}}[$__rate_interval]),
+    "namespace", "$1", "exported_namespace", "(.*)"
+  ),
+  "pod", "$1", "exported_pod", "(.*)"
+)
+* on (cluster, namespace, pod) group_left(workload, workload_type)
+group by (cluster, namespace, pod, workload, workload_type) (
+  namespace_workload_pod:kube_pod_owner:relabel{${workloadOwnerMatch(scope)}, pod!="", workload!="", workload_type!=""}
+)
+`;
+}
+
+function scopedIngressGauge(metric: string, scope: EntityScope = {}, extraMatchers = '') {
+  const directMatchers = joinMatchers(ingressRouteMatchers(scope), 'route!=""', extraMatchers);
+
+  if (!scope.workload) {
+    return `${metric}{${directMatchers}}`;
+  }
+
+  const workloadMetricMatchers = joinMatchers(
+    ingressClusterMatcher(scope),
+    'exported_namespace!=""',
+    'exported_pod!=""',
+    'route!=""',
+    extraMatchers
+  );
+
+  return `
+label_replace(
+  label_replace(
+    ${metric}{${workloadMetricMatchers}},
+    "namespace", "$1", "exported_namespace", "(.*)"
+  ),
+  "pod", "$1", "exported_pod", "(.*)"
+)
+* on (cluster, namespace, pod) group_left(workload, workload_type)
+group by (cluster, namespace, pod, workload, workload_type) (
+  namespace_workload_pod:kube_pod_owner:relabel{${workloadOwnerMatch(scope)}, pod!="", workload!="", workload_type!=""}
+)
+`;
+}
+
+function aviRouteInfoJoin(scope: EntityScope = {}) {
+  const filters = joinMatchers(
+    matcher('cluster', scope.cluster ?? '${cluster:regex}'),
+    matcher('namespace', scope.namespace),
+    scope.workload ? matcher('to_name', scope.workload) : undefined,
+    'host!=""'
+  );
+
+  return `
+label_replace(
+  label_replace(
+    label_replace(
+      label_replace(
+        openshift_route_info{${filters}},
+        "ocp_cluster", "$1", "cluster", "(.*)"
+      ),
+      "ocp_namespace", "$1", "namespace", "(.*)"
+    ),
+    "ocp_route", "$1", "route", "(.*)"
+  ),
+  "ocp_service", "$1", "to_name", "(.*)"
+)
+`;
+}
+
+function scopedAviRouteMetric(metric: string, scope: EntityScope = {}, extraMatchers = '') {
+  const filters = joinMatchers('server_address!=""', extraMatchers);
+
+  return `
+label_replace(
+  label_replace(
+    ${metric}{${filters}},
+    "host", "$1", "server_address", "(.*)"
+  ),
+  "avi_cluster", "$1", "cluster", "(.*)"
+)
+* on (host) group_left(ocp_cluster, ocp_namespace, ocp_route, ocp_service)
+${aviRouteInfoJoin(scope).trim()}
+`;
+}
 
 export function akoHostRules(scope: EntityScope = {}) {
   return `
@@ -99,8 +221,8 @@ topk(10,
 export function topIngressServicesByLatency(scope: EntityScope = {}) {
   return `
 topk(10,
-  avg by (cluster, service) (
-    haproxy_server_http_average_response_latency_milliseconds{${scopedMatchers(scope)}, service!=""} != 0
+  avg by (cluster, exported_namespace, exported_service) (
+    haproxy_server_http_average_response_latency_milliseconds{${scopedMatchers(scope)}, exported_service!=""} != 0
   )
 )
 `;
@@ -109,9 +231,189 @@ topk(10,
 export function ingressRouteCount(scope: EntityScope = {}) {
   return `
 count by (cluster) (
-  count by (cluster, route, service) (
-    haproxy_server_up{${scopedMatchers(scope)}, route!="", service!=""} == 1
+  count by (cluster, route, exported_namespace, exported_service) (
+    haproxy_server_up{${scopedMatchers(scope)}, route!="", exported_service!=""} == 1
   )
+)
+`;
+}
+
+export function httpRequestRate(scope: EntityScope = {}) {
+  return `
+sum by (cluster) (
+  ${scopedIngressRate('haproxy_server_http_responses_total', scope, 'code!=""').trim()}
+)
+`;
+}
+
+export function httpErrorRate(scope: EntityScope = {}) {
+  return `
+sum by (cluster) (
+  ${scopedIngressRate('haproxy_server_http_responses_total', scope, 'code=~"4xx|5xx"').trim()}
+)
+`;
+}
+
+export function httpErrorRatio(scope: EntityScope = {}) {
+  return `
+sum by (cluster) (
+  ${scopedIngressRate('haproxy_server_http_responses_total', scope, 'code=~"4xx|5xx"').trim()}
+)
+/
+sum by (cluster) (
+  ${scopedIngressRate('haproxy_server_http_responses_total', scope, 'code!=""').trim()}
+)
+`;
+}
+
+export function httpAverageResponseLatency(scope: EntityScope = {}) {
+  return `
+avg by (cluster) (
+  ${scopedIngressGauge('haproxy_server_http_average_response_latency_milliseconds', scope).trim()} != 0
+)
+`;
+}
+
+export function httpIncomingBytes(scope: EntityScope = {}) {
+  return `
+sum by (cluster) (
+  ${scopedIngressRate('haproxy_server_bytes_in_total', scope).trim()}
+)
+`;
+}
+
+export function httpOutgoingBytes(scope: EntityScope = {}) {
+  return `
+sum by (cluster) (
+  ${scopedIngressRate('haproxy_server_bytes_out_total', scope).trim()}
+)
+`;
+}
+
+export function httpRoutesByTraffic(scope: EntityScope = {}) {
+  return `
+topk(10,
+  sum by (cluster, namespace, workload, workload_type, route, exported_namespace, exported_service) (
+    ${scopedIngressRate('haproxy_server_bytes_in_total', scope).trim()}
+    +
+    ${scopedIngressRate('haproxy_server_bytes_out_total', scope).trim()}
+  )
+)
+`;
+}
+
+export function httpResponsesByCode(scope: EntityScope = {}) {
+  return `
+sum by (cluster, namespace, workload, workload_type, route, exported_namespace, exported_service, code) (
+  ${scopedIngressRate('haproxy_server_http_responses_total', scope, 'code!=""').trim()}
+)
+`;
+}
+
+export function httpBackendServers(scope: EntityScope = {}) {
+  return `
+sum by (cluster, namespace, workload, workload_type, route, exported_namespace, exported_service, exported_pod, server) (
+  ${scopedIngressRate('haproxy_server_bytes_in_total', scope).trim()}
+)
+`;
+}
+
+export function openshiftRoutes(scope: EntityScope = {}) {
+  const filters = joinMatchers(ingressClusterMatcher(scope), matcher('namespace', scope.namespace), 'route!=""');
+
+  return `
+max by (cluster, namespace, route, host, service, to_kind, to_name, tls_termination) (
+  openshift_route_info{${filters}}
+)
+`;
+}
+
+export function relatedAkoHostRules(scope: EntityScope = {}) {
+  const filters = joinMatchers(ingressClusterMatcher(scope), matcher('exported_namespace', scope.namespace), 'fqdn!=""');
+
+  return `
+max by (cluster, exported_namespace, fqdn, name, status) (
+  ako_hostrule_info{${filters}}
+)
+`;
+}
+
+export function aviRouteHealthScore(scope: EntityScope = {}) {
+  return `
+avg by (avi_cluster, tenant, service_instance_name, server_address, ocp_cluster, ocp_namespace, ocp_route, ocp_service) (
+  ${scopedAviRouteMetric('avi_healthscore_health_score_value', scope, 'type="virtualservice"').trim()}
+)
+`;
+}
+
+export function aviRouteResponseLatency(scope: EntityScope = {}) {
+  return `
+avg by (avi_cluster, tenant, service_instance_name, server_address, ocp_cluster, ocp_namespace, ocp_route, ocp_service) (
+  ${scopedAviRouteMetric('avi_l7_server_avg_resp_latency', scope).trim()}
+)
+`;
+}
+
+export function aviRoute2xxResponses(scope: EntityScope = {}) {
+  return `
+avg by (avi_cluster, tenant, service_instance_name, server_address, ocp_cluster, ocp_namespace, ocp_route, ocp_service) (
+  ${scopedAviRouteMetric('avi_l7_client_avg_resp_2xx', scope).trim()}
+)
+`;
+}
+
+export function aviRoute4xxResponses(scope: EntityScope = {}) {
+  return `
+avg by (avi_cluster, tenant, service_instance_name, server_address, ocp_cluster, ocp_namespace, ocp_route, ocp_service) (
+  ${scopedAviRouteMetric('avi_l7_client_avg_resp_4xx', scope).trim()}
+)
+`;
+}
+
+export function aviRoute5xxResponses(scope: EntityScope = {}) {
+  return `
+avg by (avi_cluster, tenant, service_instance_name, server_address, ocp_cluster, ocp_namespace, ocp_route, ocp_service) (
+  ${scopedAviRouteMetric('avi_l7_client_avg_resp_5xx', scope).trim()}
+)
+`;
+}
+
+export function netscalerTopologyNodes() {
+  return 'netscaler_topology_node{chain=~".*${chain:regex}.*"}';
+}
+
+export function netscalerTopologyEdges() {
+  return 'netscaler_topology_edge{chain=~".*${chain:regex}.*"}';
+}
+
+export function netscalerChainComponents() {
+  return `
+max by (node_type, title, state) (
+  netscaler_topology_node{chain=~".*\${chain:regex}.*"}
+)
+`;
+}
+
+export function netscalerLbTraffic() {
+  return `
+sum by (virtual_server) (
+  rate(netscaler_virtual_servers_total_request_bytes{virtual_server=~"\${lbvserver:regex}"}[$__rate_interval])
+)
+`;
+}
+
+export function netscalerLbResponses() {
+  return `
+sum by (virtual_server) (
+  rate(netscaler_virtual_servers_total_response_bytes{virtual_server=~"\${lbvserver:regex}"}[$__rate_interval])
+)
+`;
+}
+
+export function netscalerServicegroupMembers() {
+  return `
+max by (servicegroup, member, port) (
+  netscaler_servicegroup_state{servicegroup=~"\${servicegroup:regex}"}
 )
 `;
 }

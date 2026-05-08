@@ -7,6 +7,7 @@ import {
   alertsOnlyScene,
   cpuScene,
   eventsScene,
+  httpScene,
   logsScene,
   memoryScene,
   networkScene,
@@ -93,6 +94,13 @@ export function getClustersPage() {
                 routePath: '/network',
                 preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
                 getScene: () => networkScene({ cluster }),
+              }),
+              new SceneAppPage({
+                title: 'HTTP',
+                url: `${clusterUrl}/http`,
+                routePath: '/http',
+                preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
+                getScene: () => httpScene({ cluster }),
               }),
               new SceneAppPage({
                 title: 'Logs',

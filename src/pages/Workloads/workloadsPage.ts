@@ -7,6 +7,7 @@ import {
   alertsOnlyScene,
   cpuScene,
   eventsScene,
+  httpScene,
   logsScene,
   memoryScene,
   namespaceMetadataScene,
@@ -74,6 +75,12 @@ export function getWorkloadsPage() {
                 url: `${prefixRoute(ROUTES.Workloads)}/${encodeURIComponent(cluster)}/${encodeURIComponent(namespace)}/${encodeURIComponent(workloadType)}/${encodeURIComponent(workload)}/network`,
                 routePath: '/network',
                 getScene: () => networkScene({ cluster, namespace, workload, workloadType }),
+              }),
+              new SceneAppPage({
+                title: 'HTTP',
+                url: `${prefixRoute(ROUTES.Workloads)}/${encodeURIComponent(cluster)}/${encodeURIComponent(namespace)}/${encodeURIComponent(workloadType)}/${encodeURIComponent(workload)}/http`,
+                routePath: '/http',
+                getScene: () => httpScene({ cluster, namespace, workload, workloadType }),
               }),
               new SceneAppPage({
                 title: 'Logs',

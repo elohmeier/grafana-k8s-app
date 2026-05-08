@@ -7,6 +7,7 @@ import {
   alertsOnlyScene,
   cpuScene,
   eventsScene,
+  httpScene,
   logsScene,
   memoryScene,
   namespaceMetadataScene,
@@ -66,6 +67,12 @@ export function getPodsPage() {
                 url: `${prefixRoute(ROUTES.Pods)}/${encodeURIComponent(cluster)}/${encodeURIComponent(namespace)}/${encodeURIComponent(pod)}/network`,
                 routePath: '/network',
                 getScene: () => networkScene({ cluster, namespace, pod }),
+              }),
+              new SceneAppPage({
+                title: 'HTTP',
+                url: `${prefixRoute(ROUTES.Pods)}/${encodeURIComponent(cluster)}/${encodeURIComponent(namespace)}/${encodeURIComponent(pod)}/http`,
+                routePath: '/http',
+                getScene: () => httpScene({ cluster, namespace, pod }),
               }),
               new SceneAppPage({
                 title: 'Logs',

@@ -59,6 +59,10 @@ export function promTableRunner(queries: PromTableQuery[]) {
   });
 }
 
+export function promTableQueryRunner(queries: PromTableQuery[]) {
+  return promTableRunner(queries);
+}
+
 export function prometheusTableData(expr: string) {
   return new SceneDataTransformer({
     $data: promRunner(expr, 'A', { format: 'table', instant: true, legendFormat: '', timeRangeCompare: false }),
@@ -231,6 +235,18 @@ export function topTablePanel(title: string, expr: string, unit?: string, links:
   }
 
   return builder.build();
+}
+
+export function nodeGraphPanel(title: string, nodesExpr: string, edgesExpr: string) {
+  return PanelBuilders.nodegraph()
+    .setTitle(title)
+    .setData(
+      promTableQueryRunner([
+        { refId: 'nodes', expr: nodesExpr, legendFormat: '' },
+        { refId: 'edges', expr: edgesExpr, legendFormat: '' },
+      ])
+    )
+    .build();
 }
 
 export function linkedTablePanel(title: string, expr: string, links: DataLink[]) {

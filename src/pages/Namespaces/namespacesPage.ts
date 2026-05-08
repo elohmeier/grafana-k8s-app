@@ -7,6 +7,7 @@ import {
   alertsOnlyScene,
   cpuScene,
   eventsScene,
+  httpScene,
   logsScene,
   memoryScene,
   namespaceMetadataScene,
@@ -72,6 +73,12 @@ export function getNamespacesPage() {
                 url: `${prefixRoute(ROUTES.Namespaces)}/${encodeURIComponent(cluster)}/${encodeURIComponent(namespace)}/network`,
                 routePath: '/network',
                 getScene: () => networkScene({ cluster, namespace }),
+              }),
+              new SceneAppPage({
+                title: 'HTTP',
+                url: `${prefixRoute(ROUTES.Namespaces)}/${encodeURIComponent(cluster)}/${encodeURIComponent(namespace)}/http`,
+                routePath: '/http',
+                getScene: () => httpScene({ cluster, namespace }),
               }),
               new SceneAppPage({
                 title: 'Logs',

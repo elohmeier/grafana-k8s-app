@@ -2,7 +2,7 @@ import { SceneDataTransformer, SceneQueryRunner } from '@grafana/scenes';
 
 import { nodeMemoryUtilization } from '../queries/node';
 import { clusterCpuUsage, nodeConditions } from '../queries/prometheus';
-import { legendFromPromQuery, linkedTablePanel, prometheusTableData, tablePanel, timeseriesPanel } from './panels';
+import { legendFromPromQuery, linkedTablePanel, nodeGraphPanel, prometheusTableData, tablePanel, timeseriesPanel } from './panels';
 
 function panelQuery(panel: ReturnType<typeof tablePanel>) {
   const data = panel.state.$data;
@@ -61,5 +61,27 @@ describe('panel query construction', () => {
   it('derives legends from aggregate labels and selector labels', () => {
     expect(legendFromPromQuery(clusterCpuUsage())).toBe('{{cluster}}');
     expect(legendFromPromQuery(nodeMemoryUtilization())).toBe('{{cluster}} / {{node}}');
+  });
+
+  it('builds node graph panels from Prometheus table node and edge queries', () => {
+    const panel = nodeGraphPanel('Topology', 'nodes_expr', 'edges_expr');
+    const runner = panel.state.$data as SceneQueryRunner;
+
+    expect(runner.state.queries).toMatchObject([
+      {
+        refId: 'nodes',
+        expr: 'nodes_expr',
+        format: 'table',
+        instant: true,
+        range: false,
+      },
+      {
+        refId: 'edges',
+        expr: 'edges_expr',
+        format: 'table',
+        instant: true,
+        range: false,
+      },
+    ]);
   });
 });
