@@ -1,3 +1,11 @@
+# [1.3.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.2.0...v1.3.0) (2026-05-08)
+
+
+### Features
+
+* app rename & config page ([16628e4](https://github.com/elohmeier/grafana-k8s-app/commit/16628e471fa978fd4f3cecf2937f968d8c843af6))
+* bound high-cardinality dashboard panels ([a33c60a](https://github.com/elohmeier/grafana-k8s-app/commit/a33c60a31f9b6c01abcf6260ab30db398fea2954)), closes [hi#cardinality](https://github.com/hi/issues/cardinality)
+
 # [1.2.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.1.0...v1.2.0) (2026-05-08)
 
 
