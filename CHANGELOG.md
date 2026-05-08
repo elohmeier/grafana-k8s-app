@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.1.0...v1.2.0) (2026-05-08)
+
+
+### Features
+
+* add platform operations and capacity views ([4084ead](https://github.com/elohmeier/grafana-k8s-app/commit/4084eadd7e81d3e44ce581abca1eaec5e4865e2a))
+
 # [1.1.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.0.6...v1.1.0) (2026-05-07)
 
 
