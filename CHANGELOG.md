@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.3.0...v1.4.0) (2026-05-08)
+
+
+### Features
+
+* improve cluster inventory scene ([c7207c5](https://github.com/elohmeier/grafana-k8s-app/commit/c7207c539fbd206c6db9011cc0b0003c0880c178))
+
 # [1.3.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.2.0...v1.3.0) (2026-05-08)
 
 
