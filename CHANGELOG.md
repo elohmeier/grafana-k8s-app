@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.4.0...v1.5.0) (2026-05-08)
+
+
+### Features
+
+* add ingress http scene views ([f390b45](https://github.com/elohmeier/grafana-k8s-app/commit/f390b45d1f090d1ed14c032f11d7ca5dcf68eb06))
+
 # [1.4.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.3.0...v1.4.0) (2026-05-08)
 
 
