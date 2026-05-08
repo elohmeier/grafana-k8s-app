@@ -45,7 +45,7 @@ export function pageScene(
       to: 'now',
       refreshOnActivate: { afterMs: 60_000 },
     }),
-    $variables: getGlobalVariables(extraVariables),
+    $variables: getGlobalVariables(controls, extraVariables),
     controls: [
       ...variableControls(controls),
       new SceneTimeRangeCompare({

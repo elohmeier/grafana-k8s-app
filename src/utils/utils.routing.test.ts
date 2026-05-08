@@ -6,19 +6,25 @@ describe('prefixRoute', () => {
   it('builds app routes from the plugin id', () => {
     expect(PLUGIN_BASE_URL).toBe('/a/kubernetes-observability-app');
     expect(prefixRoute(ROUTES.Overview)).toBe('/a/kubernetes-observability-app/overview');
-    expect(prefixRoute(`${ROUTES.Namespaces}/:namespace/*`)).toBe('/a/kubernetes-observability-app/namespaces/:namespace/*');
+    expect(prefixRoute(`${ROUTES.Namespaces}/:namespace/*`)).toBe(
+      '/a/kubernetes-observability-app/namespaces/:namespace/*'
+    );
   });
 });
 
 describe('entity data links', () => {
   it('builds drilldown URLs from table row fields', () => {
-    expect(namespaceLink().url).toBe('/a/kubernetes-observability-app/namespaces/${__data.fields.cluster}/${__data.fields.namespace}');
+    expect(namespaceLink().url).toBe(
+      '/a/kubernetes-observability-app/namespaces/${__data.fields.cluster:percentencode}/${__data.fields.namespace:percentencode}?${__all_variables}&${__url_time_range}'
+    );
     expect(workloadLink().url).toBe(
-      '/a/kubernetes-observability-app/workloads/${__data.fields.cluster}/${__data.fields.namespace}/${__data.fields.workload_type}/${__data.fields.workload}'
+      '/a/kubernetes-observability-app/workloads/${__data.fields.cluster:percentencode}/${__data.fields.namespace:percentencode}/${__data.fields.workload_type:percentencode}/${__data.fields.workload:percentencode}?${__all_variables}&${__url_time_range}'
     );
     expect(podLink().url).toBe(
-      '/a/kubernetes-observability-app/pods/${__data.fields.cluster}/${__data.fields.namespace}/${__data.fields.pod}'
+      '/a/kubernetes-observability-app/pods/${__data.fields.cluster:percentencode}/${__data.fields.namespace:percentencode}/${__data.fields.pod:percentencode}?${__all_variables}&${__url_time_range}'
     );
-    expect(nodeLink().url).toBe('/a/kubernetes-observability-app/nodes/${__data.fields.cluster}/${__data.fields.node}');
+    expect(nodeLink().url).toBe(
+      '/a/kubernetes-observability-app/nodes/${__data.fields.cluster:percentencode}/${__data.fields.node:percentencode}?${__all_variables}&${__url_time_range}'
+    );
   });
 });

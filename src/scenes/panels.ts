@@ -10,6 +10,12 @@ type PromRunnerOptions = {
   timeRangeCompare?: boolean;
 };
 
+export type PromTableQuery = {
+  refId: string;
+  expr: string;
+  legendFormat: string;
+};
+
 type ThresholdStep = {
   color: string;
   value: number;
@@ -36,6 +42,23 @@ export function promRunner(expr: string, refId = 'A', options: PromRunnerOptions
   });
 }
 
+export function promTableRunner(queries: PromTableQuery[]) {
+  return new SceneQueryRunner({
+    datasource: prometheusDatasource(),
+    queries: queries.map((query) => ({
+      refId: query.refId,
+      expr: query.expr,
+      format: 'table',
+      instant: true,
+      legendFormat: query.legendFormat,
+      range: false,
+      timeRangeCompare: false,
+    })),
+    maxDataPoints: 800,
+    minInterval: '30s',
+  });
+}
+
 export function prometheusTableData(expr: string) {
   return new SceneDataTransformer({
     $data: promRunner(expr, 'A', { format: 'table', instant: true, legendFormat: '', timeRangeCompare: false }),
@@ -55,6 +78,35 @@ export function prometheusTableData(expr: string) {
   });
 }
 
+export function joinedPrometheusTableData(
+  queries: PromTableQuery[],
+  renameByName: Record<string, string>,
+  excludeByName: Record<string, boolean> = {}
+) {
+  return new SceneDataTransformer({
+    $data: promTableRunner(queries),
+    transformations: [
+      {
+        id: 'joinByField',
+        options: {
+          byField: 'cluster',
+          mode: 'outerTabular',
+        },
+      },
+      {
+        id: 'organize',
+        options: {
+          excludeByName: {
+            Time: true,
+            ...excludeByName,
+          },
+          renameByName,
+        },
+      },
+    ],
+  });
+}
+
 function absoluteThresholds(steps: ThresholdStep[]) {
   return {
     mode: ThresholdsMode.Absolute,
@@ -62,7 +114,7 @@ function absoluteThresholds(steps: ThresholdStep[]) {
   };
 }
 
-function percentThresholds() {
+export function percentThresholds() {
   return absoluteThresholds([
     { color: 'green', value: -Infinity },
     { color: 'yellow', value: 0.8 },
@@ -101,7 +153,17 @@ export function legendFromPromQuery(expr: string) {
       .map((matcher) => matcher.match(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:!?=|!?=~)/)?.[1])
       .filter((label): label is string => Boolean(label))
   );
-  const legendLabels = ['cluster', 'namespace', 'workload', 'workload_type', 'node', 'pod', 'container', 'mountpoint', 'device'];
+  const legendLabels = [
+    'cluster',
+    'namespace',
+    'workload',
+    'workload_type',
+    'node',
+    'pod',
+    'container',
+    'mountpoint',
+    'device',
+  ];
   const labelsInOrder = legendLabels.filter((label) => selectorLabels.includes(label));
 
   return labelsInOrder.map((label) => `{{${label}}}`).join(' / ');

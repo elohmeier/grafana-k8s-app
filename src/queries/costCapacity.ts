@@ -76,10 +76,50 @@ sum by (cluster) (
 `;
 }
 
+export function projectedMonthlyClusterCost(scope: EntityScope = {}) {
+  return `
+(${dailyClusterCost(scope).trim()}) * 30
+`;
+}
+
 export function priorMonthlyClusterCost(scope: EntityScope = {}) {
   return `
 sum by (cluster) (
   sum_over_time(node_total_hourly_cost{${clusterMatchers(scope)}}[30d:1h] offset 30d)
+)
+`;
+}
+
+export function clusterIdleCpuRequests(scope: EntityScope = {}) {
+  return `
+sum by (cluster) (
+  clamp_min(
+    sum by (cluster) (
+      kube_pod_container_resource_requests{${clusterMatchers(scope)}, resource="cpu", container!="", container!="POD"}
+    )
+    -
+    sum by (cluster) (
+      rate(container_cpu_usage_seconds_total{${clusterMatchers(scope)}, container!="", container!="POD"}[$__rate_interval])
+    ),
+    0
+  )
+)
+`;
+}
+
+export function clusterIdleMemoryBytes(scope: EntityScope = {}) {
+  return `
+sum by (cluster) (
+  clamp_min(
+    sum by (cluster) (
+      kube_pod_container_resource_requests{${clusterMatchers(scope)}, resource="memory", container!="", container!="POD"}
+    )
+    -
+    sum by (cluster) (
+      container_memory_working_set_bytes{${clusterMatchers(scope)}, container!="", container!="POD"}
+    ),
+    0
+  )
 )
 `;
 }

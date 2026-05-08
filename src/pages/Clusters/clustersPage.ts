@@ -14,79 +14,105 @@ import {
   storageScene,
 } from '../common/entityScenes';
 
+const CLUSTER_PAGE_URL_KEYS = [
+  'from',
+  'to',
+  'timezone',
+  'var-datasource',
+  'var-elasticsearch',
+  'var-infraDatasource',
+  'var-cluster',
+  'var-clusterView',
+  'var-severity',
+  'var-alertname',
+  'var-alertCategory',
+];
+
 export function getClustersPage() {
   return new SceneAppPage({
     title: 'Clusters',
     subTitle: 'Cluster capacity, health, and drilldowns',
     url: prefixRoute(ROUTES.Clusters),
     routePath: `${ROUTES.Clusters}/*`,
+    preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
     getScene: clustersScene,
     drilldowns: [
       {
         routePath: ':cluster/*',
         getPage(routeMatch, parent) {
           const cluster = decodeURIComponent(routeMatch.params.cluster ?? '');
+          const clusterUrl = `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}`;
 
           return new SceneAppPage({
             title: cluster,
             subTitle: 'Cluster detail',
-            url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}`,
+            url: clusterUrl,
             routePath: ':cluster/*',
+            preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
             getParentPage: () => parent,
             getScene: () => clusterDetailScene(cluster),
             tabs: [
               new SceneAppPage({
                 title: 'Overview',
-                url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}`,
+                url: clusterUrl,
                 routePath: '/',
+                preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
                 getScene: () => clusterDetailScene(cluster),
               }),
               new SceneAppPage({
                 title: 'CPU',
-                url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}/cpu`,
+                url: `${clusterUrl}/cpu`,
                 routePath: '/cpu',
+                preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
                 getScene: () => cpuScene({ cluster }),
               }),
               new SceneAppPage({
                 title: 'Memory',
-                url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}/memory`,
+                url: `${clusterUrl}/memory`,
                 routePath: '/memory',
+                preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
                 getScene: () => memoryScene({ cluster }),
               }),
               new SceneAppPage({
                 title: 'Resources',
-                url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}/resources`,
+                url: `${clusterUrl}/resources`,
                 routePath: '/resources',
+                preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
                 getScene: () => resourcesScene({ cluster }),
               }),
               new SceneAppPage({
                 title: 'Storage',
-                url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}/storage`,
+                url: `${clusterUrl}/storage`,
                 routePath: '/storage',
+                preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
                 getScene: () => storageScene({ cluster }),
               }),
               new SceneAppPage({
                 title: 'Network',
-                url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}/network`,
+                url: `${clusterUrl}/network`,
                 routePath: '/network',
+                preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
                 getScene: () => networkScene({ cluster }),
               }),
               new SceneAppPage({
                 title: 'Logs',
-                url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}/logs`,
+                url: `${clusterUrl}/logs`,
                 routePath: '/logs',
+                preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
                 getScene: () => logsScene({ cluster }),
               }),
               new SceneAppPage({
                 title: 'Events',
-                url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}/events`,
+                url: `${clusterUrl}/events`,
                 routePath: '/events',
+                preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
                 getScene: () => eventsScene({ cluster }),
               }),
               new SceneAppPage({
                 title: 'Alerts',
-                url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}/alerts`,
+                url: `${clusterUrl}/alerts`,
                 routePath: '/alerts',
+                preserveUrlKeys: CLUSTER_PAGE_URL_KEYS,
                 getScene: () => alertsOnlyScene({ cluster }),
               }),
             ],
