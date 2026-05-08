@@ -47,3 +47,23 @@ export function searchContainersQuery() {
     `topk(100, max by (cluster, namespace, pod, container) (${normalizedOtelKubeMetric('k8s_container_info', {}, containsSearchTerm('container_name'))}))`
   );
 }
+
+export function searchPersistentVolumeClaimsQuery() {
+  return `
+topk(100,
+  max by (cluster, namespace, persistentvolumeclaim, storageclass, volumename) (
+    kube_persistentvolumeclaim_info{${containsSearchTerm('persistentvolumeclaim')}}
+  )
+)
+`;
+}
+
+export function searchArgoCdApplicationsQuery() {
+  return `
+topk(100,
+  max by (cluster, namespace, name, project, health_status, sync_status) (
+    argocd_app_info{name=~\`.*${term}.*\`}
+  )
+)
+`;
+}

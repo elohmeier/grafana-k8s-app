@@ -6,6 +6,8 @@ import { clustersScene } from './clustersScene';
 import {
   alertsOnlyScene,
   cpuScene,
+  eventsScene,
+  logsScene,
   memoryScene,
   networkScene,
   resourcesScene,
@@ -68,6 +70,18 @@ export function getClustersPage() {
                 url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}/network`,
                 routePath: '/network',
                 getScene: () => networkScene({ cluster }),
+              }),
+              new SceneAppPage({
+                title: 'Logs',
+                url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}/logs`,
+                routePath: '/logs',
+                getScene: () => logsScene({ cluster }),
+              }),
+              new SceneAppPage({
+                title: 'Events',
+                url: `${prefixRoute(ROUTES.Clusters)}/${encodeURIComponent(cluster)}/events`,
+                routePath: '/events',
+                getScene: () => eventsScene({ cluster }),
               }),
               new SceneAppPage({
                 title: 'Alerts',

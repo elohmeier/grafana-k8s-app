@@ -3,7 +3,15 @@ import { ROUTES } from '../../constants';
 import { prefixRoute } from '../../utils/utils.routing';
 import { nodeDetailScene } from './nodeDetailScene';
 import { nodesScene } from './nodesScene';
-import { alertsOnlyScene, cpuScene, memoryScene, networkScene, nodeRuntimeScene } from '../common/entityScenes';
+import {
+  alertsOnlyScene,
+  cpuScene,
+  eventsScene,
+  logsScene,
+  memoryScene,
+  networkScene,
+  nodeRuntimeScene,
+} from '../common/entityScenes';
 
 export function getNodesPage() {
   return new SceneAppPage({
@@ -56,6 +64,18 @@ export function getNodesPage() {
                 url: `${prefixRoute(ROUTES.Nodes)}/${encodeURIComponent(cluster)}/${encodeURIComponent(node)}/network`,
                 routePath: '/network',
                 getScene: () => networkScene({ cluster, node }),
+              }),
+              new SceneAppPage({
+                title: 'Logs',
+                url: `${prefixRoute(ROUTES.Nodes)}/${encodeURIComponent(cluster)}/${encodeURIComponent(node)}/logs`,
+                routePath: '/logs',
+                getScene: () => logsScene({ cluster, node }),
+              }),
+              new SceneAppPage({
+                title: 'Events',
+                url: `${prefixRoute(ROUTES.Nodes)}/${encodeURIComponent(cluster)}/${encodeURIComponent(node)}/events`,
+                routePath: '/events',
+                getScene: () => eventsScene({ cluster, node }),
               }),
               new SceneAppPage({
                 title: 'Alerts',

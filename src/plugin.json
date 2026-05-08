@@ -87,6 +87,12 @@
     },
     {
       "type": "page",
+      "name": "Cost & Capacity",
+      "path": "/a/%PLUGIN_ID%/cost-capacity",
+      "addToNav": true
+    },
+    {
+      "type": "page",
       "name": "Platform Operations",
       "path": "/a/%PLUGIN_ID%/platform",
       "addToNav": true

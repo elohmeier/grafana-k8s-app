@@ -5,6 +5,7 @@ import { PluginPropsContext } from '../../utils/utils.plugin';
 import { getAlertsPage } from '../../pages/Alerts/alertsPage';
 import { getClustersPage } from '../../pages/Clusters/clustersPage';
 import { getConfigurationPage } from '../../pages/Configuration/configurationPage';
+import { getCostCapacityPage } from '../../pages/CostCapacity/costCapacityPage';
 import { getHealthPage } from '../../pages/Health/healthPage';
 import { getJobsPage } from '../../pages/Jobs/jobsPage';
 import { getNamespacesPage } from '../../pages/Namespaces/namespacesPage';
@@ -30,6 +31,7 @@ function getSceneApp() {
       getPersistentVolumesPage(),
       getJobsPage(),
       getAlertsPage(),
+      getCostCapacityPage(),
       getPlatformPage(),
       getConfigurationPage(),
     ],

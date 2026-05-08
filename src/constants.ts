@@ -14,6 +14,7 @@ export enum ROUTES {
   PersistentVolumes = 'persistent-volumes',
   Jobs = 'jobs',
   Alerts = 'alerts',
+  CostCapacity = 'cost-capacity',
   Platform = 'platform',
   Configuration = 'configuration',
 }

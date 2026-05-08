@@ -35,6 +35,8 @@ function alertSeries(filters: string) {
   ALERTS_FOR_STATE{${stateFilters}}
   or
   ALERTS{${filters}}
+  or
+  GRAFANA_ALERTS{${filters}}
 )
 `;
 }

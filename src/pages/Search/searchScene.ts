@@ -4,9 +4,11 @@ import { linkedTablePanel, tablePanel, textPanel } from '../../scenes/panels';
 import {
   searchClustersQuery,
   searchContainersQuery,
+  searchArgoCdApplicationsQuery,
   searchNamespacesQuery,
   searchNodesQuery,
   searchPodsQuery,
+  searchPersistentVolumeClaimsQuery,
   searchWorkloadsQuery,
 } from '../../queries/search';
 import { clusterLink, namespaceLink, nodeLink, podLink, workloadLink } from '../../utils/entityLinks';
@@ -45,6 +47,13 @@ export function searchScene() {
         [
           item(tablePanel('Containers', searchContainersQuery()), '50%', 260),
           item(linkedTablePanel('Nodes', searchNodesQuery(), [nodeLink()]), '50%', 260),
+        ],
+        280
+      ),
+      row(
+        [
+          item(linkedTablePanel('PVCs', searchPersistentVolumeClaimsQuery(), [namespaceLink()]), '50%', 260),
+          item(tablePanel('ArgoCD applications', searchArgoCdApplicationsQuery()), '50%', 260),
         ],
         280
       ),
