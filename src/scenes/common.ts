@@ -10,7 +10,7 @@ import {
   VariableValueControl,
   VariableValueSelectors,
 } from '@grafana/scenes';
-import { getGlobalVariables } from './variables';
+import { getGlobalVariables, type GlobalVariableOptions } from './variables';
 
 export const METRICS_CONTROLS = ['datasource'] as const;
 export const CLUSTER_CONTROLS = ['datasource', 'cluster'] as const;
@@ -24,6 +24,10 @@ export const GLOBAL_ALERT_CONTROLS = ['datasource', 'cluster', 'namespace', ...A
 export const DETAIL_ALERT_CONTROLS = ['datasource', ...ALERT_FILTER_CONTROLS] as const;
 
 type VariableControls = readonly string[] | 'all';
+type PageSceneOptions = {
+  includeComparison?: boolean;
+  variableOptions?: GlobalVariableOptions;
+};
 
 function variableControls(controls: VariableControls) {
   if (controls === 'all') {
@@ -37,20 +41,27 @@ export function pageScene(
   children: SceneFlexItem[],
   from = 'now-1h',
   extraVariables: SceneVariable[] = [],
-  controls: VariableControls = NAMESPACE_CONTROLS
+  controls: VariableControls = NAMESPACE_CONTROLS,
+  options: PageSceneOptions = {}
 ) {
+  const includeComparison = options.includeComparison ?? true;
+
   return new EmbeddedScene({
     $timeRange: new SceneTimeRange({
       from,
       to: 'now',
       refreshOnActivate: { afterMs: 60_000 },
     }),
-    $variables: getGlobalVariables(controls, extraVariables),
+    $variables: getGlobalVariables(controls, extraVariables, options.variableOptions),
     controls: [
       ...variableControls(controls),
-      new SceneTimeRangeCompare({
-        hideCheckbox: true,
-      }),
+      ...(includeComparison
+        ? [
+            new SceneTimeRangeCompare({
+              hideCheckbox: true,
+            }),
+          ]
+        : []),
       new SceneTimePicker({ isOnCanvas: true }),
       new SceneRefreshPicker({}),
     ],

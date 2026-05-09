@@ -93,6 +93,12 @@
     },
     {
       "type": "page",
+      "name": "Resource Simulator",
+      "path": "/a/%PLUGIN_ID%/resource-simulator",
+      "addToNav": true
+    },
+    {
+      "type": "page",
       "name": "Platform Operations",
       "path": "/a/%PLUGIN_ID%/platform",
       "addToNav": true

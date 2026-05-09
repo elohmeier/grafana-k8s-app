@@ -15,6 +15,7 @@ export enum ROUTES {
   Jobs = 'jobs',
   Alerts = 'alerts',
   CostCapacity = 'cost-capacity',
+  ResourceSimulator = 'resource-simulator',
   Platform = 'platform',
   Configuration = 'configuration',
 }

@@ -16,6 +16,17 @@ import {
   relatedAkoHostRules,
 } from './platformIngress';
 import { cpuRequests, cpuRequestsToCapacity, cpuUsage, cpuUsageP95, cpuUsageToRequests, memoryWorkingSet, topCpuConsumers } from './resources';
+import {
+  simulatorClusterAllocatableQuery,
+  simulatorQuotaQuery,
+  simulatorWorkloadContainersQuery,
+  simulatorWorkloadLimitsQuery,
+  simulatorWorkloadPodsQuery,
+  simulatorWorkloadPvcCountQuery,
+  simulatorWorkloadPvcStorageQuery,
+  simulatorWorkloadReplicasQuery,
+  simulatorWorkloadRequestsQuery,
+} from './resourceSimulator';
 import { deploymentReadiness, podWaitingReasons } from './scheduling';
 import {
   searchClustersQuery,
@@ -134,6 +145,81 @@ describe('resource query builders', () => {
     expect(capacityQuery).toContain('on (cluster) group_left()');
     expect(p95Query).toContain('quantile_over_time(0.95');
     expect(topQuery).toContain('topk(10');
+  });
+});
+
+describe('resource simulator query builders', () => {
+  it('scopes quota metrics by cluster and namespace variables', () => {
+    const quotaQuery = compact(simulatorQuotaQuery());
+
+    expect(quotaQuery).toContain('cluster=~"${cluster:regex}"');
+    expect(quotaQuery).toContain('namespace=~"${namespace:regex}"');
+    expect(quotaQuery).toContain('requests[.]cpu');
+    expect(quotaQuery).toContain('requests[.]memory');
+    expect(quotaQuery).toContain('limits[.]cpu');
+    expect(quotaQuery).toContain('limits[.]memory');
+    expect(quotaQuery).toContain('requests[.]storage');
+    expect(quotaQuery).toContain('persistentvolumeclaims');
+    expect(quotaQuery).toContain('count/.*');
+  });
+
+  it('queries current Deployment and StatefulSet replica baselines', () => {
+    const query = compact(simulatorWorkloadReplicasQuery({ cluster: 'c1', namespace: 'ns1' }));
+
+    expect(query).toContain('kube_deployment_spec_replicas');
+    expect(query).toContain('"workload", "$1", "deployment"');
+    expect(query).toContain('"workload_type", "deployment"');
+    expect(query).toContain('kube_statefulset_replicas');
+    expect(query).toContain('"workload", "$1", "statefulset"');
+    expect(query).toContain('"workload_type", "statefulset"');
+    expect(query).toContain('cluster=~"c1"');
+    expect(query).toContain('namespace=~"ns1"');
+  });
+
+  it('queries workload pod, container, request, and limit baselines through owner joins', () => {
+    const podsQuery = compact(simulatorWorkloadPodsQuery({ cluster: 'c1', namespace: 'ns1' }));
+    const containersQuery = compact(simulatorWorkloadContainersQuery({ cluster: 'c1', namespace: 'ns1' }));
+    const requestsQuery = compact(simulatorWorkloadRequestsQuery({ cluster: 'c1', namespace: 'ns1' }));
+    const limitsQuery = compact(simulatorWorkloadLimitsQuery({ cluster: 'c1', namespace: 'ns1' }));
+
+    expect(podsQuery).toContain('namespace_workload_pod:kube_pod_owner:relabel');
+    expect(podsQuery).toContain('workload_type=~"deployment|statefulset"');
+    expect(containersQuery).toContain('kube_pod_container_info');
+    expect(containersQuery).toContain('count by (cluster, namespace, workload, workload_type, container)');
+    expect(containersQuery).toContain('group_left(workload, workload_type)');
+    expect(requestsQuery).toContain('kube_pod_container_resource_requests');
+    expect(requestsQuery).toContain('sum by (cluster, namespace, workload, workload_type, container, resource)');
+    expect(requestsQuery).toContain('resource=~"cpu|memory"');
+    expect(requestsQuery).toContain('group_left(workload, workload_type)');
+    expect(limitsQuery).toContain('kube_pod_container_resource_limits');
+    expect(limitsQuery).toContain('sum by (cluster, namespace, workload, workload_type, container, resource)');
+    expect(limitsQuery).toContain('resource=~"cpu|memory"');
+    expect(limitsQuery).toContain('group_left(workload, workload_type)');
+    expect(requestsQuery).toContain('cluster=~"c1"');
+    expect(requestsQuery).toContain('namespace=~"ns1"');
+  });
+
+  it('queries workload PVC count and storage baselines through pod volume joins', () => {
+    const countQuery = compact(simulatorWorkloadPvcCountQuery({ cluster: 'c1', namespace: 'ns1' }));
+    const storageQuery = compact(simulatorWorkloadPvcStorageQuery({ cluster: 'c1', namespace: 'ns1' }));
+
+    expect(countQuery).toContain('kube_pod_spec_volumes_persistentvolumeclaims_info');
+    expect(countQuery).toContain('group by (cluster, namespace, workload, workload_type, persistentvolumeclaim)');
+    expect(countQuery).toContain('persistentvolumeclaim!=""');
+    expect(countQuery).toContain('group_left(workload, workload_type)');
+    expect(storageQuery).toContain('kube_persistentvolumeclaim_resource_requests_storage_bytes');
+    expect(storageQuery).toContain('persistentvolumeclaim!=""');
+    expect(storageQuery).toContain('group_right(workload, workload_type)');
+    expect(storageQuery).toContain('cluster=~"c1"');
+    expect(storageQuery).toContain('namespace=~"ns1"');
+  });
+
+  it('queries cluster allocatable for CPU, memory, and pods', () => {
+    const query = compact(simulatorClusterAllocatableQuery({ cluster: 'c1' }));
+
+    expect(query).toContain('kube_node_status_allocatable');
+    expect(query).toContain('cluster=~"c1"');
+    expect(query).toContain('resource=~"cpu|memory|pods"');
   });
 });
 

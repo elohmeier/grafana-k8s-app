@@ -14,7 +14,8 @@ const topLevelRoutes = [
   { path: 'persistent-volumes', text: 'PV/PVC inventory' },
   { path: 'jobs', text: 'CronJobs' },
   { path: 'alerts', text: 'Firing Kubernetes alerts' },
-  { path: 'platform', text: 'Platform Operations backlog' },
+  { path: 'resource-simulator', text: 'Resource Simulator' },
+  { path: 'platform', text: 'Platform Operations' },
   { path: 'configuration', text: 'Datasource contract' },
 ];
 
@@ -48,5 +49,37 @@ test.describe('Kubernetes observability app', () => {
     await gotoAppPage({ pluginId, path: 'overview' });
 
     await expect(page.getByRole('button', { name: 'Comparison: None' })).toBeVisible();
+  });
+
+  test('renders resource simulator workload editor and restores URL state', async ({ gotoAppPage, page }) => {
+    await gotoAppPage({
+      pluginId,
+      path: 'resource-simulator',
+    });
+
+    await expect(page.getByText('Workloads').first()).toBeVisible();
+    await expect(page.getByText('Projected Quota And Capacity')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Comparison:/ })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Add workload' }).click();
+    await expect(page.getByRole('columnheader', { name: 'Type' })).toBeVisible();
+    await expect(page.getByLabel('Temporary workload name')).toHaveValue(/temp-workload-/);
+
+    await page.getByLabel('Temporary workload name').fill('load-test');
+    await page.getByLabel('Simulated replicas for load-test').fill('3');
+    await page.getByRole('button', { name: 'Expand containers for load-test' }).click();
+    await page.getByLabel('CPU request for container app in load-test').fill('1');
+    await page.getByLabel('Memory request for container app in load-test').fill('2 Gi');
+    await page.getByLabel('PVC count for load-test').fill('1');
+    await page.getByLabel('PVC storage for load-test').fill('20Gi');
+
+    await expect(page).toHaveURL(/scenario=/);
+    await page.reload();
+    await expect(page.getByLabel('Temporary workload name')).toHaveValue('load-test');
+    await expect(page.getByLabel('Simulated replicas for load-test')).toHaveValue('3');
+    await page.getByRole('button', { name: 'Expand containers for load-test' }).click();
+    await expect(page.getByLabel('CPU request for container app in load-test')).toHaveValue('1');
+    await expect(page.getByLabel('Memory request for container app in load-test')).toHaveValue('2Gi');
+    await expect(page.getByLabel('PVC storage for load-test')).toHaveValue('20Gi');
   });
 });

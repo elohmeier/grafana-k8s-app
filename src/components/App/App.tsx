@@ -14,6 +14,7 @@ import { getNodesPage } from '../../pages/Nodes/nodesPage';
 import { getOverviewPage } from '../../pages/Overview/overviewPage';
 import { getPersistentVolumesPage } from '../../pages/PersistentVolumes/persistentVolumesPage';
 import { getPlatformPage } from '../../pages/Platform/platformPage';
+import { getResourceSimulatorPage } from '../../pages/ResourceSimulator/resourceSimulatorPage';
 import { getPodsPage } from '../../pages/Pods/podsPage';
 import { getSearchPage } from '../../pages/Search/searchPage';
 import { getWorkloadsPage } from '../../pages/Workloads/workloadsPage';
@@ -33,6 +34,7 @@ function getSceneApp() {
       getJobsPage(),
       getAlertsPage(),
       getCostCapacityPage(),
+      getResourceSimulatorPage(),
       getPlatformPage(),
       getConfigurationPage(),
     ],

@@ -14,6 +14,10 @@ type BuiltInVariableName =
   | 'alertname'
   | 'alertCategory';
 
+export type GlobalVariableOptions = {
+  singleSelectVariables?: readonly BuiltInVariableName[];
+};
+
 const BUILT_IN_VARIABLES: BuiltInVariableName[] = [
   'datasource',
   'elasticsearch',
@@ -61,7 +65,29 @@ function hideIfDependency(name: BuiltInVariableName, requested: Set<string>) {
   return requested.has(name) ? undefined : VariableHide.hideVariable;
 }
 
-export function getGlobalVariables(controls: VariableControls = 'all', extraVariables: SceneVariable[] = []) {
+function selectionOptions(name: BuiltInVariableName, options: GlobalVariableOptions) {
+  const isSingleSelect = options.singleSelectVariables?.includes(name);
+
+  return isSingleSelect
+    ? {
+        value: '',
+        text: '',
+        includeAll: false,
+        isMulti: false,
+      }
+    : {
+        value: '$__all',
+        includeAll: true,
+        isMulti: true,
+        allValue: '.*',
+      };
+}
+
+export function getGlobalVariables(
+  controls: VariableControls = 'all',
+  extraVariables: SceneVariable[] = [],
+  options: GlobalVariableOptions = {}
+) {
   const defaults = getDatasourceDefaults();
   const requested = requestedVariables(controls);
   const included = expandDependencies(requested);
@@ -110,10 +136,7 @@ export function getGlobalVariables(controls: VariableControls = 'all', extraVari
         label: 'Cluster',
         datasource: PROMETHEUS_REF,
         query: 'label_values(kube_node_info, cluster)',
-        value: '$__all',
-        includeAll: true,
-        isMulti: true,
-        allValue: '.*',
+        ...selectionOptions('cluster', options),
         refresh: VariableRefresh.onDashboardLoad,
         sort: VariableSort.alphabeticalAsc,
         hide: hideIfDependency('cluster', requested),
@@ -128,10 +151,7 @@ export function getGlobalVariables(controls: VariableControls = 'all', extraVari
         label: 'Namespace',
         datasource: PROMETHEUS_REF,
         query: 'label_values(kube_namespace_status_phase{cluster=~"${cluster:regex}"}, namespace)',
-        value: '$__all',
-        includeAll: true,
-        isMulti: true,
-        allValue: '.*',
+        ...selectionOptions('namespace', options),
         refresh: VariableRefresh.onDashboardLoad,
         sort: VariableSort.alphabeticalAsc,
         hide: hideIfDependency('namespace', requested),
