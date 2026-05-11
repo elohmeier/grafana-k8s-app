@@ -155,7 +155,7 @@ sum by (cluster, namespace, workload, workload_type) (
       persistentvolumeclaim!=""
     }
   )
-  * on (cluster, namespace, persistentvolumeclaim) group_right(workload, workload_type)
+  * on (cluster, namespace, persistentvolumeclaim) group_right()
   ${workloadPvcSelector(scope)}
 )
 `;

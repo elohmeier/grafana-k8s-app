@@ -209,7 +209,7 @@ describe('resource simulator query builders', () => {
     expect(countQuery).toContain('group_left(workload, workload_type)');
     expect(storageQuery).toContain('kube_persistentvolumeclaim_resource_requests_storage_bytes');
     expect(storageQuery).toContain('persistentvolumeclaim!=""');
-    expect(storageQuery).toContain('group_right(workload, workload_type)');
+    expect(storageQuery).toContain('group_right()');
     expect(storageQuery).toContain('cluster=~"c1"');
     expect(storageQuery).toContain('namespace=~"ns1"');
   });
