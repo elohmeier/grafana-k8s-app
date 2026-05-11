@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.7.0...v1.8.0) (2026-05-11)
+
+
+### Features
+
+* show configmap and secret quotas ([5c3b8ab](https://github.com/elohmeier/grafana-k8s-app/commit/5c3b8ab5d87c14f0f3bb6b77de1deae613d19595))
+
 # [1.7.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.6.0...v1.7.0) (2026-05-11)
 
 
