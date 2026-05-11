@@ -1,4 +1,4 @@
-import { QueryVariable, SceneTimeRangeCompare } from '@grafana/scenes';
+import { QueryVariable, SceneTimePicker, SceneTimeRangeCompare } from '@grafana/scenes';
 import { NAMESPACE_CONTROLS, pageScene } from './common';
 import { getGlobalVariables } from './variables';
 
@@ -14,6 +14,10 @@ function queryVariable(name: string, variables = getGlobalVariables(NAMESPACE_CO
 
 function hasComparisonControl(scene: ReturnType<typeof pageScene>) {
   return scene.state.controls?.some((control) => control instanceof SceneTimeRangeCompare) ?? false;
+}
+
+function hasTimePicker(scene: ReturnType<typeof pageScene>) {
+  return scene.state.controls?.some((control) => control instanceof SceneTimePicker) ?? false;
 }
 
 describe('global scene variables', () => {
@@ -66,9 +70,16 @@ describe('page scene controls', () => {
     expect(hasComparisonControl(scene)).toBe(false);
   });
 
+  it('can omit the time picker control', () => {
+    const scene = pageScene([], 'now-15m', [], NAMESPACE_CONTROLS, { includeTimePicker: false });
+
+    expect(hasTimePicker(scene)).toBe(false);
+  });
+
   it('includes the time comparison control by default', () => {
     const scene = pageScene([], 'now-15m', [], NAMESPACE_CONTROLS);
 
     expect(hasComparisonControl(scene)).toBe(true);
+    expect(hasTimePicker(scene)).toBe(true);
   });
 });

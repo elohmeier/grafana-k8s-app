@@ -75,6 +75,39 @@ describe('resource simulator model', () => {
     expect(pods?.hard).toBe(50);
   });
 
+  it('treats zero-replica workloads as scaled-to-zero instead of missing baselines', () => {
+    const baseline = buildBaseline([
+      sample('workloadReplicas', deploymentLabels, 0),
+    ]);
+    const results = calculateSimulatorResults(baseline, scenario());
+    const workload = results.workloadRows.find((row) => row.id === 'deployment/api');
+
+    expect(workload).toMatchObject({
+      currentReplicas: 0,
+      currentPods: 0,
+      currentContainers: 0,
+      simulatedReplicas: 0,
+      isScaledToZero: true,
+      missingResourceBaseline: false,
+    });
+    expect(results.warnings).not.toContain('1 workload row has missing resource baselines.');
+  });
+
+  it('still marks non-zero workloads without resource metrics as missing baselines', () => {
+    const baseline = buildBaseline([
+      sample('workloadReplicas', deploymentLabels, 2),
+      sample('workloadPods', deploymentLabels, 2),
+    ]);
+    const results = calculateSimulatorResults(baseline, scenario());
+    const workload = results.workloadRows.find((row) => row.id === 'deployment/api');
+
+    expect(workload).toMatchObject({
+      isScaledToZero: false,
+      missingResourceBaseline: true,
+    });
+    expect(results.warnings).toContain('1 workload row has missing resource baselines.');
+  });
+
   it('models scaling existing Deployments and StatefulSets up and down', () => {
     const baseline = buildBaseline([
       sample('quota', { resource: 'pods', type: 'used' }, 10),
@@ -188,7 +221,7 @@ describe('resource simulator model', () => {
     expect(results.rows.find((row) => row.key === 'count/statefulsets.apps')?.projected).toBe(2);
   });
 
-  it('marks exceeded and unknown hard limits', () => {
+  it('marks exceeded hard limits and treats missing quota hard limits as unlimited', () => {
     const baseline = buildBaseline([
       sample('quota', { resource: 'requests.cpu', type: 'used' }, 9),
       sample('quota', { resource: 'requests.cpu', type: 'hard' }, 10),
@@ -209,7 +242,22 @@ describe('resource simulator model', () => {
     );
 
     expect(results.rows.find((row) => row.key === 'requests.cpu')?.status).toBe('exceeded');
-    expect(results.rows.find((row) => row.key === 'requests.memory')?.status).toBe('unknown');
+    expect(results.rows.find((row) => row.key === 'requests.memory')).toMatchObject({
+      hard: undefined,
+      remaining: undefined,
+      status: 'unlimited',
+    });
+    expect(results.warnings).not.toContain('Some quota hard limits are missing; those rows are shown as unknown rather than failed.');
+  });
+
+  it('keeps missing capacity hard values unknown', () => {
+    const results = calculateSimulatorResults(buildBaseline([]), scenario());
+
+    expect(results.rows.find((row) => row.key === 'cluster.requests.cpu')).toMatchObject({
+      source: 'capacity',
+      hard: undefined,
+      status: 'unknown',
+    });
   });
 
   it('normalizes malformed URL scenario state', () => {

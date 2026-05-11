@@ -26,6 +26,7 @@ export const DETAIL_ALERT_CONTROLS = ['datasource', ...ALERT_FILTER_CONTROLS] as
 type VariableControls = readonly string[] | 'all';
 type PageSceneOptions = {
   includeComparison?: boolean;
+  includeTimePicker?: boolean;
   variableOptions?: GlobalVariableOptions;
 };
 
@@ -45,6 +46,7 @@ export function pageScene(
   options: PageSceneOptions = {}
 ) {
   const includeComparison = options.includeComparison ?? true;
+  const includeTimePicker = options.includeTimePicker ?? true;
 
   return new EmbeddedScene({
     $timeRange: new SceneTimeRange({
@@ -62,7 +64,7 @@ export function pageScene(
             }),
           ]
         : []),
-      new SceneTimePicker({ isOnCanvas: true }),
+      ...(includeTimePicker ? [new SceneTimePicker({ isOnCanvas: true })] : []),
       new SceneRefreshPicker({}),
     ],
     body: new SceneFlexLayout({

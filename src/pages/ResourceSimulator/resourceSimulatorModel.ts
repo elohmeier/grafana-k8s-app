@@ -94,10 +94,11 @@ export type WorkloadSimulationRow = WorkloadBaseline &
   WorkloadEditableValues & {
     isTemporary: boolean;
     changed: boolean;
+    isScaledToZero: boolean;
     missingResourceBaseline: boolean;
   };
 
-export type SimulatorRowStatus = 'ok' | 'warning' | 'exceeded' | 'unknown';
+export type SimulatorRowStatus = 'ok' | 'warning' | 'exceeded' | 'unlimited' | 'unknown';
 export type SimulatorRowUnit = 'count' | 'cores' | 'bytes';
 export type SimulatorRowSource = 'quota' | 'capacity';
 
@@ -428,15 +429,17 @@ export function buildWorkloadRows(baseline: SimulatorBaseline, scenario: Workloa
     const defaults = editableDefaults(workload);
     const override = scenario.overrides[workload.id];
     const values = override ?? defaults;
+    const isScaledToZero = workload.currentReplicas === 0 && workload.currentPods === 0 && workload.currentContainers === 0;
+    const hasResourceBaseline =
+      workload.currentCpuRequests > 0 || workload.currentMemoryRequests > 0 || workload.currentCpuLimits > 0 || workload.currentMemoryLimits > 0;
 
     return {
       ...workload,
       ...values,
       isTemporary: false,
       changed: Boolean(override),
-      missingResourceBaseline:
-        workload.currentContainers === 0 ||
-        (workload.currentCpuRequests === 0 && workload.currentMemoryRequests === 0 && workload.currentCpuLimits === 0 && workload.currentMemoryLimits === 0),
+      isScaledToZero,
+      missingResourceBaseline: !isScaledToZero && (workload.currentContainers === 0 || !hasResourceBaseline),
     };
   });
 
@@ -455,6 +458,7 @@ export function buildWorkloadRows(baseline: SimulatorBaseline, scenario: Workloa
       currentPvcStorageBytes: 0,
       isTemporary: true,
       changed: true,
+      isScaledToZero: false,
       missingResourceBaseline: false,
     });
   }
@@ -550,9 +554,9 @@ function hardValue(baseline: SimulatorBaseline, ...resources: string[]) {
   return undefined;
 }
 
-function statusFor(projected: number, hard?: number): SimulatorRowStatus {
+function statusFor(projected: number, hard: number | undefined, source: SimulatorRowSource): SimulatorRowStatus {
   if (!finite(hard)) {
-    return 'unknown';
+    return source === 'quota' ? 'unlimited' : 'unknown';
   }
 
   if (projected > hard) {
@@ -590,7 +594,7 @@ function resultRow(
     hard,
     remaining,
     ratio,
-    status: statusFor(projected, hard),
+    status: statusFor(projected, hard, source),
   };
 }
 
@@ -749,15 +753,10 @@ export function calculateSimulatorResults(
 function buildWarnings(rows: SimulatorResultRow[], workloadRows: WorkloadSimulationRow[], baseline: SimulatorBaseline) {
   const warnings: string[] = [];
   const exceeded = rows.filter((row) => row.status === 'exceeded');
-  const unknownQuota = rows.filter((row) => row.source === 'quota' && row.status === 'unknown');
   const missingBaselineRows = workloadRows.filter((row) => !row.isTemporary && row.missingResourceBaseline);
 
   if (exceeded.length > 0) {
     warnings.push(`${exceeded.length} projected resource ${exceeded.length === 1 ? 'limit is' : 'limits are'} exceeded.`);
-  }
-
-  if (unknownQuota.length > 0) {
-    warnings.push('Some quota hard limits are missing; those rows are shown as unknown rather than failed.');
   }
 
   if (baseline.quotas.pods?.used === undefined && baseline.quotas['count/pods']?.used === undefined && baseline.workloads.length > 0) {

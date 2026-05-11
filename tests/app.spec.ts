@@ -59,6 +59,7 @@ test.describe('Kubernetes observability app', () => {
 
     await expect(page.getByText('Workloads').first()).toBeVisible();
     await expect(page.getByText('Projected Quota And Capacity')).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Used' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Comparison:/ })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Add workload' }).click();

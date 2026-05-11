@@ -260,15 +260,28 @@ function ResourceSimulatorRenderer({ model }: SceneComponentProps<ResourceSimula
         ))}
 
         <div className={styles.summaryGrid}>
-          {summaryRows(results.rows).map((summary) => (
-            <div className={styles.summary} key={summary.key}>
-              <span className={styles.summaryLabel}>{summary.label}</span>
-              <strong className={styles.summaryValue}>{formatValue(summary.projected, summary.unit)}</strong>
-              <span className={styles.summaryMeta}>
-                {formatDelta(summary.delta, summary.unit)} {summary.hard !== undefined ? `/ ${formatValue(summary.hard, summary.unit)}` : '/ no hard limit'}
-              </span>
-            </div>
-          ))}
+          {summaryRows(results.rows).map((summary) => {
+            const progressWidth = summary.ratio === undefined ? undefined : `${Math.min(100, Math.max(0, summary.ratio * 100))}%`;
+
+            return (
+              <div className={`${styles.summary} ${summaryStatusClass(styles, summary.status)}`} key={summary.key}>
+                <div className={styles.summaryHeader}>
+                  <span className={styles.summaryLabel}>{summary.label}</span>
+                  <StatusBadge status={summary.status} />
+                </div>
+                <strong className={styles.summaryValue}>{formatValue(summary.projected, summary.unit)}</strong>
+                <span className={styles.summaryMeta}>
+                  {formatDelta(summary.delta, summary.unit)} · {formatUsageSummary(summary)}
+                </span>
+                {progressWidth !== undefined && (
+                  <div className={styles.summaryProgress} aria-label={`${formatUsageValue(summary)} used`}>
+                    <div className={`${styles.summaryProgressFill} ${progressStatusClass(styles, summary.status)}`} style={{ width: progressWidth }} />
+                  </div>
+                )}
+                <span className={styles.summaryHelp}>{formatRemainingSummary(summary)}</span>
+              </div>
+            );
+          })}
         </div>
 
         <div className={styles.section}>
@@ -356,6 +369,7 @@ function WorkloadTable({
                       <IconButton
                         aria-expanded={expanded}
                         aria-label={`${expanded ? 'Collapse containers for' : 'Expand containers for'} ${row.name}`}
+                        className={styles.collapseButton}
                         name={expanded ? 'angle-down' : 'angle-right'}
                         size="sm"
                         onClick={toggleContainers}
@@ -392,7 +406,9 @@ function WorkloadTable({
                   </td>
                   <td>{row.currentReplicas}</td>
                   <td>
-                    <NumberInput
+                    <CountStepper
+                      decreaseLabel={`Decrease replicas in ${row.name}`}
+                      increaseLabel={`Increase replicas in ${row.name}`}
                       label={`Simulated replicas for ${row.name}`}
                       value={row.simulatedReplicas}
                       min={0}
@@ -406,7 +422,9 @@ function WorkloadTable({
                   <td>{formatGiBQuantity(podTotals.memoryRequests)}</td>
                   <td>{formatGiBQuantity(podTotals.memoryLimits)}</td>
                   <td>
-                    <NumberInput
+                    <CountStepper
+                      decreaseLabel={`Decrease PVCs in ${row.name}`}
+                      increaseLabel={`Increase PVCs in ${row.name}`}
                       label={`PVC count for ${row.name}`}
                       value={row.pvcCount}
                       min={0}
@@ -424,7 +442,17 @@ function WorkloadTable({
                     />
                   </td>
                   <td className={styles.deltaCell}>{formatWorkloadDelta(delta)}</td>
-                  <td>{row.missingResourceBaseline ? <Badge color="orange" text="Missing baseline" /> : row.changed ? <Badge color="blue" text="Edited" /> : <Badge color="green" text="Live" />}</td>
+                  <td>
+                    {row.missingResourceBaseline ? (
+                      <Badge color="orange" text="Missing baseline" />
+                    ) : row.changed ? (
+                      <Badge color="blue" text="Edited" />
+                    ) : row.isScaledToZero ? (
+                      <Badge color="blue" text="Scaled to zero" />
+                    ) : (
+                      <Badge color="green" text="Live" />
+                    )}
+                  </td>
                   <td>
                     <Button variant="secondary" size="sm" onClick={() => model.resetRow(row)}>
                       {row.isTemporary ? 'Remove' : 'Reset'}
@@ -577,6 +605,7 @@ function ResultTable({ rows }: { rows: SimulatorResultRow[] }) {
             <th>Baseline</th>
             <th>Delta</th>
             <th>Projected</th>
+            <th>Used</th>
             <th>Hard limit</th>
             <th>Remaining</th>
             <th>Status</th>
@@ -594,8 +623,9 @@ function ResultTable({ rows }: { rows: SimulatorResultRow[] }) {
               <td>{formatValue(resultRow.baseline, resultRow.unit)}</td>
               <td>{formatDelta(resultRow.delta, resultRow.unit)}</td>
               <td>{formatValue(resultRow.projected, resultRow.unit)}</td>
-              <td>{resultRow.hard === undefined ? '-' : formatValue(resultRow.hard, resultRow.unit)}</td>
-              <td>{resultRow.remaining === undefined ? '-' : formatValue(resultRow.remaining, resultRow.unit)}</td>
+              <td>{formatUsageValue(resultRow)}</td>
+              <td>{formatLimitValue(resultRow)}</td>
+              <td>{formatRemainingValue(resultRow)}</td>
               <td>
                 <StatusBadge status={resultRow.status} />
               </td>
@@ -607,17 +637,61 @@ function ResultTable({ rows }: { rows: SimulatorResultRow[] }) {
   );
 }
 
-function NumberInput({
+function CountStepper({
   label,
+  decreaseLabel,
+  increaseLabel,
   value,
   min,
   step,
   onChange,
 }: {
   label: string;
+  decreaseLabel: string;
+  increaseLabel: string;
   value: number;
   min: number;
   step: number;
+  onChange: (value: number) => void;
+}) {
+  const styles = useStyles2(getStyles);
+  const setCount = (next: number) => onChange(Math.max(min, Math.round(next)));
+
+  return (
+    <div className={styles.countStepper}>
+      <IconButton
+        aria-label={decreaseLabel}
+        className={styles.stepperButton}
+        disabled={value <= min}
+        name="minus"
+        size="sm"
+        onClick={() => setCount(value - step)}
+      />
+      <NumberInput label={label} value={value} min={min} step={step} width={7} onChange={setCount} />
+      <IconButton
+        aria-label={increaseLabel}
+        className={styles.stepperButton}
+        name="plus"
+        size="sm"
+        onClick={() => setCount(value + step)}
+      />
+    </div>
+  );
+}
+
+function NumberInput({
+  label,
+  value,
+  min,
+  step,
+  width = 9,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  step: number;
+  width?: number;
   onChange: (value: number) => void;
 }) {
   return (
@@ -627,7 +701,7 @@ function NumberInput({
       min={min}
       step={step}
       value={formatInputValue(value)}
-      width={9}
+      width={width}
       onChange={(event) => onChange(clampNumber(event.currentTarget.valueAsNumber, min))}
     />
   );
@@ -689,7 +763,16 @@ function QuantityInput({
 
 function StatusBadge({ status }: { status: SimulatorRowStatus }) {
   const color = status === 'exceeded' ? 'red' : status === 'warning' ? 'orange' : status === 'ok' ? 'green' : 'blue';
-  const text = status === 'exceeded' ? 'Exceeded' : status === 'warning' ? 'Near limit' : status === 'ok' ? 'OK' : 'Unknown';
+  const text =
+    status === 'exceeded'
+      ? 'Exceeded'
+      : status === 'warning'
+        ? 'Near limit'
+        : status === 'unlimited'
+          ? 'Unlimited'
+          : status === 'ok'
+            ? 'OK'
+            : 'Unknown';
 
   return <Badge color={color} text={text} />;
 }
@@ -830,6 +913,86 @@ function formatWorkloadDelta(delta?: ReturnType<typeof calculateSimulatorResults
   ].join(' / ');
 }
 
+function summaryStatusClass(styles: ReturnType<typeof getStyles>, status: SimulatorRowStatus) {
+  if (status === 'exceeded') {
+    return styles.summaryExceeded;
+  }
+
+  if (status === 'warning') {
+    return styles.summaryWarning;
+  }
+
+  if (status === 'unlimited') {
+    return styles.summaryUnlimited;
+  }
+
+  if (status === 'unknown') {
+    return styles.summaryUnknown;
+  }
+
+  return styles.summaryOk;
+}
+
+function progressStatusClass(styles: ReturnType<typeof getStyles>, status: SimulatorRowStatus) {
+  if (status === 'exceeded') {
+    return styles.summaryProgressExceeded;
+  }
+
+  if (status === 'warning') {
+    return styles.summaryProgressWarning;
+  }
+
+  if (status === 'unknown') {
+    return styles.summaryProgressUnknown;
+  }
+
+  return styles.summaryProgressOk;
+}
+
+function formatUsageSummary(row: SimulatorResultRow) {
+  if (row.ratio !== undefined) {
+    return `${formatPercentage(row.ratio)} of ${formatValue(row.hard ?? 0, row.unit)}`;
+  }
+
+  if (row.status === 'unlimited') {
+    return 'Unlimited';
+  }
+
+  return row.source === 'capacity' ? 'No capacity data' : 'No limit data';
+}
+
+function formatUsageValue(row: SimulatorResultRow) {
+  return row.ratio === undefined ? '-' : formatPercentage(row.ratio);
+}
+
+function formatLimitValue(row: SimulatorResultRow) {
+  if (row.hard !== undefined) {
+    return formatValue(row.hard, row.unit);
+  }
+
+  return row.status === 'unlimited' ? 'Unlimited' : 'Unknown';
+}
+
+function formatRemainingValue(row: SimulatorResultRow) {
+  if (row.remaining !== undefined) {
+    return row.remaining < 0 ? `${formatValue(Math.abs(row.remaining), row.unit)} over` : formatValue(row.remaining, row.unit);
+  }
+
+  return row.status === 'unlimited' ? 'Unlimited' : '-';
+}
+
+function formatRemainingSummary(row: SimulatorResultRow) {
+  if (row.remaining !== undefined) {
+    return row.remaining < 0 ? `${formatValue(Math.abs(row.remaining), row.unit)} over` : `${formatValue(row.remaining, row.unit)} remaining`;
+  }
+
+  if (row.status === 'unlimited') {
+    return 'No configured hard limit';
+  }
+
+  return row.source === 'capacity' ? 'Capacity data missing' : 'Limit data missing';
+}
+
 function formatDelta(value: number, unit: SimulatorRowUnit) {
   if (Math.abs(value) < 0.000001) {
     return '+0';
@@ -848,6 +1011,10 @@ function formatValue(value: number, unit: SimulatorRowUnit) {
   }
 
   return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function formatPercentage(ratio: number) {
+  return `${(ratio * 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}%`;
 }
 
 function formatInputValue(value: number) {
@@ -878,12 +1045,45 @@ function getStyles() {
       border: '1px solid var(--border-weak)',
       borderRadius: 4,
       padding: 12,
-      minHeight: 88,
+      minHeight: 132,
+      position: 'relative',
+    }),
+    summaryOk: css({
+      background: 'linear-gradient(90deg, rgba(46, 125, 50, 0.12), transparent 58%)',
+      borderColor: 'rgba(46, 125, 50, 0.55)',
+      boxShadow: 'inset 4px 0 0 rgba(46, 125, 50, 0.9)',
+    }),
+    summaryWarning: css({
+      background: 'linear-gradient(90deg, rgba(245, 124, 0, 0.14), transparent 58%)',
+      borderColor: 'rgba(245, 124, 0, 0.65)',
+      boxShadow: 'inset 4px 0 0 rgba(245, 124, 0, 0.95)',
+    }),
+    summaryExceeded: css({
+      background: 'linear-gradient(90deg, rgba(211, 47, 47, 0.14), transparent 58%)',
+      borderColor: 'rgba(211, 47, 47, 0.7)',
+      boxShadow: 'inset 4px 0 0 rgba(211, 47, 47, 0.95)',
+    }),
+    summaryUnlimited: css({
+      background: 'linear-gradient(90deg, rgba(2, 119, 189, 0.12), transparent 58%)',
+      borderColor: 'rgba(2, 119, 189, 0.55)',
+      boxShadow: 'inset 4px 0 0 rgba(2, 119, 189, 0.85)',
+    }),
+    summaryUnknown: css({
+      background: 'linear-gradient(90deg, rgba(96, 125, 139, 0.13), transparent 58%)',
+      borderColor: 'rgba(96, 125, 139, 0.6)',
+      boxShadow: 'inset 4px 0 0 rgba(96, 125, 139, 0.9)',
+    }),
+    summaryHeader: css({
+      alignItems: 'flex-start',
+      display: 'flex',
+      gap: 8,
+      justifyContent: 'space-between',
     }),
     summaryLabel: css({
       display: 'block',
       fontSize: 12,
       opacity: 0.75,
+      paddingRight: 6,
     }),
     summaryValue: css({
       display: 'block',
@@ -896,6 +1096,37 @@ function getStyles() {
       fontSize: 12,
       marginTop: 4,
       opacity: 0.75,
+    }),
+    summaryProgress: css({
+      background: 'rgba(128, 128, 128, 0.22)',
+      borderRadius: 3,
+      height: 6,
+      marginTop: 10,
+      overflow: 'hidden',
+      width: '100%',
+    }),
+    summaryProgressFill: css({
+      borderRadius: 3,
+      height: '100%',
+      minWidth: 2,
+    }),
+    summaryProgressOk: css({
+      background: 'rgba(46, 125, 50, 0.95)',
+    }),
+    summaryProgressWarning: css({
+      background: 'rgba(245, 124, 0, 0.95)',
+    }),
+    summaryProgressExceeded: css({
+      background: 'rgba(211, 47, 47, 0.95)',
+    }),
+    summaryProgressUnknown: css({
+      background: 'rgba(96, 125, 139, 0.9)',
+    }),
+    summaryHelp: css({
+      display: 'block',
+      fontSize: 12,
+      marginTop: 8,
+      opacity: 0.82,
     }),
     section: css({
       border: '1px solid var(--border-weak)',
@@ -939,6 +1170,30 @@ function getStyles() {
       display: 'flex',
       gap: 8,
       whiteSpace: 'nowrap',
+    }),
+    collapseButton: css({
+      alignItems: 'center',
+      display: 'inline-flex',
+      height: 24,
+      justifyContent: 'center',
+      minWidth: 24,
+      padding: 0,
+      width: 24,
+    }),
+    countStepper: css({
+      alignItems: 'center',
+      display: 'flex',
+      gap: 4,
+      whiteSpace: 'nowrap',
+    }),
+    stepperButton: css({
+      alignItems: 'center',
+      display: 'inline-flex',
+      height: 24,
+      justifyContent: 'center',
+      minWidth: 24,
+      padding: 0,
+      width: 24,
     }),
     typeCell: css({
       minWidth: 150,
