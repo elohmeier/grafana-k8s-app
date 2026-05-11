@@ -875,7 +875,17 @@ function valueAt(field: Field, index: number) {
 }
 
 function summaryRows(rows: SimulatorResultRow[]) {
-  const keys = ['requests.cpu', 'requests.memory', 'requests.storage', 'pods', 'count/deployments.apps', 'count/statefulsets.apps'];
+  const keys = [
+    'requests.cpu',
+    'requests.memory',
+    'requests.storage',
+    'pods',
+    'count/deployments.apps',
+    'count/statefulsets.apps',
+    'count/persistentvolumeclaims',
+    'count/configmaps',
+    'count/secrets',
+  ];
   return keys.map((key) => rows.find((resultRow) => resultRow.key === key)).filter((row): row is SimulatorResultRow => Boolean(row));
 }
 

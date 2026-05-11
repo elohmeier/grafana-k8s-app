@@ -713,6 +713,24 @@ export function calculateSimulatorResults(
       hardValue(baseline, 'count/persistentvolumeclaims', 'persistentvolumeclaims')
     ),
     resultRow(
+      'count/configmaps',
+      'ConfigMap objects',
+      'count',
+      'quota',
+      quotaBaseline(baseline, 'count/configmaps', 0),
+      0,
+      hardValue(baseline, 'count/configmaps')
+    ),
+    resultRow(
+      'count/secrets',
+      'Secret objects',
+      'count',
+      'quota',
+      quotaBaseline(baseline, 'count/secrets', 0),
+      0,
+      hardValue(baseline, 'count/secrets')
+    ),
+    resultRow(
       'cluster.requests.cpu',
       'CPU request cluster share',
       'cores',

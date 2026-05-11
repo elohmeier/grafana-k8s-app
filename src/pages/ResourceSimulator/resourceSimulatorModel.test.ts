@@ -221,6 +221,31 @@ describe('resource simulator model', () => {
     expect(results.rows.find((row) => row.key === 'count/statefulsets.apps')?.projected).toBe(2);
   });
 
+  it('surfaces ConfigMap and Secret object quota counts as measured rows', () => {
+    const baseline = buildBaseline([
+      sample('quota', { resource: 'count/configmaps', type: 'used' }, 28),
+      sample('quota', { resource: 'count/configmaps', type: 'hard' }, 100),
+      sample('quota', { resource: 'count/secrets', type: 'used' }, 93),
+      sample('quota', { resource: 'count/secrets', type: 'hard' }, 150),
+    ]);
+    const results = calculateSimulatorResults(baseline, scenario());
+
+    expect(results.rows.find((row) => row.key === 'count/configmaps')).toMatchObject({
+      baseline: 28,
+      delta: 0,
+      projected: 28,
+      hard: 100,
+      status: 'ok',
+    });
+    expect(results.rows.find((row) => row.key === 'count/secrets')).toMatchObject({
+      baseline: 93,
+      delta: 0,
+      projected: 93,
+      hard: 150,
+      status: 'ok',
+    });
+  });
+
   it('marks exceeded hard limits and treats missing quota hard limits as unlimited', () => {
     const baseline = buildBaseline([
       sample('quota', { resource: 'requests.cpu', type: 'used' }, 9),
