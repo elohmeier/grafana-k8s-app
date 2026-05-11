@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.6.0...v1.7.0) (2026-05-11)
+
+
+### Features
+
+* resource simulator improvements ([b4f3f17](https://github.com/elohmeier/grafana-k8s-app/commit/b4f3f1770899a0245b4237ccc1b4558a4ff8ae11))
+
 # [1.6.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.5.0...v1.6.0) (2026-05-11)
 
 
