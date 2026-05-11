@@ -1,3 +1,10 @@
+## [1.8.1](https://github.com/elohmeier/grafana-k8s-app/compare/v1.8.0...v1.8.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* preserve workload labels in PVC storage query ([62d3a29](https://github.com/elohmeier/grafana-k8s-app/commit/62d3a2945e752748356e330a592f3a325889ac46))
+
 # [1.8.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.7.0...v1.8.0) (2026-05-11)
 
 
