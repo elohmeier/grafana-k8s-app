@@ -353,6 +353,7 @@ function ResourceSimulatorRenderer({ model }: SceneComponentProps<ResourceSimula
   const scenario = parseScenario(state.scenario);
   const results = calculateSimulatorResults(baseline, scenario);
   const loading = dataState?.data?.state === LoadingState.Loading || dataState?.data?.state === LoadingState.Streaming;
+  const showKafkaSection = results.kafkaRows.length > 0;
 
   return (
     <div className={styles.page}>
@@ -410,29 +411,6 @@ function ResourceSimulatorRenderer({ model }: SceneComponentProps<ResourceSimula
         <div className={styles.section}>
           <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} wrap="wrap">
             <div>
-              <h3 className={styles.sectionTitle}>Kafka instances</h3>
-              <p className={styles.sectionText}>
-                Rows are seeded from Strimzi broker and controller pools. Helper Deployments remain in the workload
-                table.
-              </p>
-            </div>
-            <Button variant="secondary" icon="plus" onClick={model.addTempKafka}>
-              Add Kafka
-            </Button>
-          </Stack>
-
-          {results.kafkaRows.length === 0 ? (
-            <Alert title="No Kafka rows" severity="info">
-              No Strimzi Kafka broker or controller pool metrics were returned for the current namespace.
-            </Alert>
-          ) : (
-            <KafkaTable model={model} rows={results.kafkaRows} deltas={results.kafkaDeltas} />
-          )}
-        </div>
-
-        <div className={styles.section}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} wrap="wrap">
-            <div>
               <h3 className={styles.sectionTitle}>Workloads</h3>
               <p className={styles.sectionText}>
                 Existing rows are seeded from live Deployment and StatefulSet metrics. Temporary rows are additive only.
@@ -442,6 +420,11 @@ function ResourceSimulatorRenderer({ model }: SceneComponentProps<ResourceSimula
               <Button variant="secondary" icon="plus" onClick={model.addTempWorkload}>
                 Add workload
               </Button>
+              {!showKafkaSection && (
+                <Button variant="secondary" icon="plus" onClick={model.addTempKafka}>
+                  Add Kafka
+                </Button>
+              )}
               <Button variant="secondary" icon="sync" onClick={model.resetScenario}>
                 Reset all
               </Button>
@@ -457,6 +440,25 @@ function ResourceSimulatorRenderer({ model }: SceneComponentProps<ResourceSimula
             <WorkloadTable model={model} rows={results.workloadRows} deltas={results.workloadDeltas} />
           )}
         </div>
+
+        {showKafkaSection && (
+          <div className={styles.section}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} wrap="wrap">
+              <div>
+                <h3 className={styles.sectionTitle}>Kafka instances</h3>
+                <p className={styles.sectionText}>
+                  Rows are seeded from Strimzi broker and controller pools. Helper Deployments remain in the workload
+                  table.
+                </p>
+              </div>
+              <Button variant="secondary" icon="plus" onClick={model.addTempKafka}>
+                Add Kafka
+              </Button>
+            </Stack>
+
+            <KafkaTable model={model} rows={results.kafkaRows} deltas={results.kafkaDeltas} />
+          </div>
+        )}
 
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>Projected Quota And Capacity</h3>

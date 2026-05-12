@@ -15,9 +15,19 @@ import {
   openshiftRoutes,
   relatedAkoHostRules,
 } from './platformIngress';
-import { cpuRequests, cpuRequestsToCapacity, cpuUsage, cpuUsageP95, cpuUsageToRequests, memoryWorkingSet, topCpuConsumers } from './resources';
+import {
+  cpuRequests,
+  cpuRequestsToCapacity,
+  cpuUsage,
+  cpuUsageP95,
+  cpuUsageToRequests,
+  memoryWorkingSet,
+  topCpuConsumers,
+} from './resources';
 import {
   simulatorClusterAllocatableQuery,
+  simulatorKafkaPvcCountQuery,
+  simulatorKafkaPvcStorageQuery,
   simulatorQuotaQuery,
   simulatorWorkloadContainersQuery,
   simulatorWorkloadLimitsQuery,
@@ -205,13 +215,23 @@ describe('resource simulator query builders', () => {
 
     expect(countQuery).toContain('kube_pod_spec_volumes_persistentvolumeclaims_info');
     expect(countQuery).toContain('group by (cluster, namespace, workload, workload_type, persistentvolumeclaim)');
-    expect(countQuery).toContain('persistentvolumeclaim!=""');
+    expect(countQuery).toContain('persistentvolumeclaim=~".+"');
     expect(countQuery).toContain('group_left(workload, workload_type)');
     expect(storageQuery).toContain('kube_persistentvolumeclaim_resource_requests_storage_bytes');
-    expect(storageQuery).toContain('persistentvolumeclaim!=""');
+    expect(storageQuery).toContain('persistentvolumeclaim=~".+"');
     expect(storageQuery).toContain('group_right()');
     expect(storageQuery).toContain('cluster=~"c1"');
     expect(storageQuery).toContain('namespace=~"ns1"');
+  });
+
+  it('requires explicit PVC labels in Kafka PVC joins', () => {
+    const countQuery = compact(simulatorKafkaPvcCountQuery({ cluster: 'c1', namespace: 'ns1' }));
+    const storageQuery = compact(simulatorKafkaPvcStorageQuery({ cluster: 'c1', namespace: 'ns1' }));
+
+    expect(countQuery).toContain('persistentvolumeclaim=~".+"');
+    expect(storageQuery).toContain('persistentvolumeclaim=~".+"');
+    expect(storageQuery).toContain('group_left(kafka, pool, role)');
+    expect(storageQuery).not.toContain('persistentvolumeclaim!=""');
   });
 
   it('queries cluster allocatable for CPU, memory, and pods', () => {
@@ -365,7 +385,9 @@ describe('ingress and HTTP query builders', () => {
   it('builds bounded route, AKO, and NetScaler helper queries', () => {
     expect(compact(openshiftRoutes({ cluster: 'c1', namespace: 'ns1' }))).toContain('openshift_route_info');
     expect(compact(openshiftRoutes({ cluster: 'c1', namespace: 'ns1' }))).toContain('namespace=~"ns1"');
-    expect(compact(relatedAkoHostRules({ cluster: 'c1' }))).toContain('max by (cluster, exported_namespace, fqdn, name, status)');
+    expect(compact(relatedAkoHostRules({ cluster: 'c1' }))).toContain(
+      'max by (cluster, exported_namespace, fqdn, name, status)'
+    );
     expect(netscalerTopologyNodes()).toContain('netscaler_topology_node');
     expect(netscalerTopologyEdges()).toContain('netscaler_topology_edge');
   });

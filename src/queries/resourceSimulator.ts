@@ -130,7 +130,7 @@ group by (cluster, namespace, workload, workload_type, persistentvolumeclaim) (
   kube_pod_spec_volumes_persistentvolumeclaims_info{
     ${simulatorMatchers(scope)},
     pod!="",
-    persistentvolumeclaim!=""
+    persistentvolumeclaim=~".+"
   }
   * on (cluster, namespace, pod) group_left(workload, workload_type)
   ${workloadOwnerSelector(scope)}
@@ -269,7 +269,7 @@ group by (cluster, namespace, kafka, pool, role, persistentvolumeclaim) (
   kube_pod_spec_volumes_persistentvolumeclaims_info{
     ${simulatorMatchers(scope)},
     pod!="",
-    persistentvolumeclaim!=""
+    persistentvolumeclaim=~".+"
   }
   * on (cluster, namespace, pod) group_left(kafka, pool, role)
   ${kafkaPoolPodSelector(scope)}
@@ -291,7 +291,7 @@ sum by (cluster, namespace, kafka, pool, role) (
   max by (cluster, namespace, persistentvolumeclaim) (
     kube_persistentvolumeclaim_resource_requests_storage_bytes{
       ${simulatorMatchers(scope)},
-      persistentvolumeclaim!=""
+      persistentvolumeclaim=~".+"
     }
   )
   * on (cluster, namespace, persistentvolumeclaim) group_left(kafka, pool, role)
@@ -314,7 +314,7 @@ sum by (cluster, namespace, workload, workload_type) (
   max by (cluster, namespace, persistentvolumeclaim) (
     kube_persistentvolumeclaim_resource_requests_storage_bytes{
       ${simulatorMatchers(scope)},
-      persistentvolumeclaim!=""
+      persistentvolumeclaim=~".+"
     }
   )
   * on (cluster, namespace, persistentvolumeclaim) group_right()
