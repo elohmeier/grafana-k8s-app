@@ -231,6 +231,7 @@ describe('resource simulator query builders', () => {
     expect(countQuery).toContain('persistentvolumeclaim=~".+"');
     expect(storageQuery).toContain('persistentvolumeclaim=~".+"');
     expect(storageQuery).toContain('group_left(kafka, pool, role)');
+    expect(storageQuery).toContain('group_left(kafka, pool, role) (');
     expect(storageQuery).not.toContain('persistentvolumeclaim!=""');
   });
 

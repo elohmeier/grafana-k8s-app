@@ -226,7 +226,7 @@ count by (cluster, namespace, kafka, pool, role, container) (
     container!="POD"
   }
   * on (cluster, namespace, pod) group_left(kafka, pool, role)
-  ${kafkaPoolPodSelector(scope)}
+  (${kafkaPoolPodSelector(scope)})
 )
 `;
 }
@@ -242,7 +242,7 @@ sum by (cluster, namespace, kafka, pool, role, container, resource) (
     resource=~"cpu|memory"
   }
   * on (cluster, namespace, pod) group_left(kafka, pool, role)
-  ${kafkaPoolPodSelector(scope)}
+  (${kafkaPoolPodSelector(scope)})
 )
 `;
 }
@@ -258,7 +258,7 @@ sum by (cluster, namespace, kafka, pool, role, container, resource) (
     resource=~"cpu|memory"
   }
   * on (cluster, namespace, pod) group_left(kafka, pool, role)
-  ${kafkaPoolPodSelector(scope)}
+  (${kafkaPoolPodSelector(scope)})
 )
 `;
 }
@@ -272,7 +272,7 @@ group by (cluster, namespace, kafka, pool, role, persistentvolumeclaim) (
     persistentvolumeclaim=~".+"
   }
   * on (cluster, namespace, pod) group_left(kafka, pool, role)
-  ${kafkaPoolPodSelector(scope)}
+  (${kafkaPoolPodSelector(scope)})
 )
 `;
 }
