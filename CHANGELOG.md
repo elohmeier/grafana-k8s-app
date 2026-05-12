@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.8.1...v1.9.0) (2026-05-12)
+
+
+### Features
+
+* add kafka to simulator ([7b19fe6](https://github.com/elohmeier/grafana-k8s-app/commit/7b19fe6f0b7dfe6adb9efaa0ced7acfd1a48758f))
+
 ## [1.8.1](https://github.com/elohmeier/grafana-k8s-app/compare/v1.8.0...v1.8.1) (2026-05-11)
 
 
