@@ -51,6 +51,7 @@ import {
   KafkaPoolSimulationRow,
   KafkaScenarioRow,
   KafkaSimulationRow,
+  linkedPvcCountForReplicaChange,
   MetricSample,
   parseScenario,
   serializeScenario,
@@ -609,7 +610,7 @@ function KafkaPoolEditor({
             <th>Pod mem req</th>
             <th>Pod mem limit</th>
             <th>PVCs</th>
-            <th>PVC storage</th>
+            <th>PVC size</th>
           </tr>
         </thead>
         <tbody>
@@ -695,7 +696,7 @@ function KafkaPoolEditor({
                 </td>
                 <td>
                   <QuantityInput
-                    label={`PVC storage for ${pool.name} in ${row.name}`}
+                    label={`PVC size for ${pool.name} in ${row.name}`}
                     value={pool.pvcStorageGiB}
                     formatter={formatGiBQuantity}
                     parser={parseByteQuantityToGiB}
@@ -738,7 +739,7 @@ function WorkloadTable({
             <th>Pod mem req</th>
             <th>Pod mem limit</th>
             <th>PVCs</th>
-            <th>PVC storage</th>
+            <th>PVC size</th>
             <th>Delta</th>
             <th>Status</th>
             <th>Actions</th>
@@ -751,6 +752,16 @@ function WorkloadTable({
             const podTotals = containerResourceTotals(row.containers);
             const onValueChange = (patch: Partial<WorkloadEditableValues>) =>
               row.isTemporary ? model.updateTempRow(row, patch) : model.updateExistingRow(row, patch);
+            const updateReplicas = (simulatedReplicas: number) =>
+              onValueChange({
+                simulatedReplicas,
+                ...linkedStatefulSetPvcPatch(row, linkedPvcCountForReplicaChange(row, simulatedReplicas)),
+              });
+            const updatePvcCount = (pvcCount: number) =>
+              onValueChange({
+                pvcCount,
+                ...linkedStatefulSetPvcPatch(row, pvcCount),
+              });
             const updateContainers = (containers: WorkloadContainerValues[]) => onValueChange({ containers });
             const toggleContainers = () => setExpandedRows((current) => ({ ...current, [row.id]: !current[row.id] }));
 
@@ -806,7 +817,7 @@ function WorkloadTable({
                       value={row.simulatedReplicas}
                       min={0}
                       step={1}
-                      onChange={(value) => onValueChange({ simulatedReplicas: value })}
+                      onChange={updateReplicas}
                     />
                   </td>
                   <td>{formatContainerCount(row)}</td>
@@ -822,12 +833,12 @@ function WorkloadTable({
                       value={row.pvcCount}
                       min={0}
                       step={1}
-                      onChange={(value) => onValueChange({ pvcCount: value })}
+                      onChange={updatePvcCount}
                     />
                   </td>
                   <td>
                     <QuantityInput
-                      label={`PVC storage for ${row.name}`}
+                      label={`PVC size for ${row.name}`}
                       value={row.pvcStorageGiB}
                       formatter={formatGiBQuantity}
                       parser={parseByteQuantityToGiB}
@@ -1208,6 +1219,17 @@ function kafkaPoolValues(pool: KafkaPoolSimulationRow): KafkaPoolEditableValues 
 function updateSingleContainer(containers: WorkloadContainerValues[], patch: Partial<WorkloadContainerValues>) {
   const [first, ...rest] = containers.length > 0 ? containers : [{ ...DEFAULT_WORKLOAD_VALUES.containers[0] }];
   return [{ ...first, ...patch }, ...rest];
+}
+
+function linkedStatefulSetPvcPatch(
+  row: WorkloadSimulationRow,
+  nextPvcCount: number | undefined
+): Partial<WorkloadEditableValues> {
+  if (row.type !== 'statefulset' || nextPvcCount === undefined) {
+    return {};
+  }
+
+  return { pvcCount: nextPvcCount };
 }
 
 function firstUrlValue(value: SceneObjectUrlValues[string]) {

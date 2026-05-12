@@ -651,6 +651,34 @@ function defaultContainers() {
   return [{ ...DEFAULT_WORKLOAD_CONTAINER_VALUES }];
 }
 
+export function linkedPvcCountForReplicaChange(
+  values: {
+    currentReplicas: number;
+    currentPvcCount: number;
+    simulatedReplicas: number;
+    pvcCount: number;
+  },
+  nextReplicas: number
+) {
+  if (values.currentReplicas <= 0 || values.currentPvcCount <= 0) {
+    return undefined;
+  }
+
+  const pvcPerReplica = values.currentPvcCount / values.currentReplicas;
+
+  if (!Number.isInteger(pvcPerReplica)) {
+    return undefined;
+  }
+
+  const linkedCurrentPvcCount = Math.max(values.currentPvcCount, values.simulatedReplicas * pvcPerReplica);
+
+  if (values.pvcCount !== linkedCurrentPvcCount) {
+    return undefined;
+  }
+
+  return Math.max(values.currentPvcCount, nextReplicas * pvcPerReplica);
+}
+
 function editableDefaults(workload: WorkloadBaseline): WorkloadEditableValues {
   const replicaBasis = workload.currentReplicas > 0 ? workload.currentReplicas : workload.currentPods;
   const containers =
@@ -676,7 +704,8 @@ function editableDefaults(workload: WorkloadBaseline): WorkloadEditableValues {
     simulatedReplicas: Math.max(0, workload.currentReplicas > 0 ? workload.currentReplicas : workload.currentPods),
     containers,
     pvcCount: workload.currentPvcCount,
-    pvcStorageGiB: workload.currentPvcStorageBytes / BYTES_PER_GIB,
+    pvcStorageGiB:
+      workload.currentPvcCount > 0 ? workload.currentPvcStorageBytes / workload.currentPvcCount / BYTES_PER_GIB : 0,
   };
 }
 
@@ -818,7 +847,9 @@ function kafkaSimulationRow(
         simulatedMemoryLimits:
           acc.simulatedMemoryLimits + pool.simulatedReplicas * podTotals.memoryLimits * BYTES_PER_GIB,
         simulatedPvcCount: acc.simulatedPvcCount + pool.pvcCount,
-        simulatedPvcStorageBytes: acc.simulatedPvcStorageBytes + pool.pvcStorageGiB * BYTES_PER_GIB,
+        simulatedPvcStorageBytes:
+          acc.simulatedPvcStorageBytes +
+          Math.max(pool.currentPvcStorageBytes, pool.pvcCount * pool.pvcStorageGiB * BYTES_PER_GIB),
       };
     },
     {
@@ -874,7 +905,7 @@ function workloadDelta(row: WorkloadSimulationRow): WorkloadDelta {
   const simulatedCpuLimits = row.simulatedReplicas * podTotals.cpuLimits;
   const simulatedMemoryRequests = row.simulatedReplicas * podTotals.memoryRequests * BYTES_PER_GIB;
   const simulatedMemoryLimits = row.simulatedReplicas * podTotals.memoryLimits * BYTES_PER_GIB;
-  const simulatedPvcStorage = row.pvcStorageGiB * BYTES_PER_GIB;
+  const simulatedPvcStorage = Math.max(row.currentPvcStorageBytes, row.pvcCount * row.pvcStorageGiB * BYTES_PER_GIB);
 
   return {
     rowId: row.id,

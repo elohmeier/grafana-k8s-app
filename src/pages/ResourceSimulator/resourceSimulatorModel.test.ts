@@ -3,6 +3,7 @@ import {
   BYTES_PER_GIB,
   calculateSimulatorResults,
   containerResourceTotals,
+  linkedPvcCountForReplicaChange,
   MetricSample,
   parseScenario,
   serializeScenario,
@@ -169,7 +170,7 @@ describe('resource simulator model', () => {
     expect(results.deltas.memoryRequests).toBe(2.5 * BYTES_PER_GIB);
   });
 
-  it('models PVC expansion on existing workloads', () => {
+  it('models per-PVC size expansion on existing workloads', () => {
     const baseline = buildBaseline([
       sample('quota', { resource: 'requests.storage', type: 'used' }, 100 * BYTES_PER_GIB),
       sample('quota', { resource: 'requests.storage', type: 'hard' }, 200 * BYTES_PER_GIB),
@@ -183,7 +184,7 @@ describe('resource simulator model', () => {
         'statefulset/db': workloadValues({
           simulatedReplicas: 1,
           pvcCount: 2,
-          pvcStorageGiB: 120,
+          pvcStorageGiB: 60,
         }),
       })
     );
@@ -191,6 +192,42 @@ describe('resource simulator model', () => {
     expect(results.deltas.pvcCount).toBe(0);
     expect(results.deltas.pvcStorage).toBe(40 * BYTES_PER_GIB);
     expect(results.rows.find((row) => row.key === 'requests.storage')?.projected).toBe(140 * BYTES_PER_GIB);
+  });
+
+  it('derives linked StatefulSet PVC count changes', () => {
+    const values = {
+      currentReplicas: 2,
+      currentPvcCount: 4,
+      simulatedReplicas: 2,
+      pvcCount: 4,
+    };
+
+    const nextPvcCount = linkedPvcCountForReplicaChange(values, 3);
+
+    expect(nextPvcCount).toBe(6);
+    expect(linkedPvcCountForReplicaChange({ ...values, pvcCount: 5 }, 3)).toBeUndefined();
+  });
+
+  it('keeps PVC size stable and derives total storage from PVC count', () => {
+    const baseline = buildBaseline([
+      sample('quota', { resource: 'requests.storage', type: 'used' }, 100 * BYTES_PER_GIB),
+      sample('workloadReplicas', statefulSetLabels, 2),
+      sample('workloadPvcCount', statefulSetLabels, 2),
+      sample('workloadPvcStorage', statefulSetLabels, 80 * BYTES_PER_GIB),
+    ]);
+    const results = calculateSimulatorResults(
+      baseline,
+      scenario({
+        'statefulset/db': workloadValues({
+          simulatedReplicas: 3,
+          pvcCount: 3,
+          pvcStorageGiB: 40,
+        }),
+      })
+    );
+
+    expect(results.deltas.pvcCount).toBe(1);
+    expect(results.deltas.pvcStorage).toBe(40 * BYTES_PER_GIB);
   });
 
   it('models temporary workload rows as additive objects', () => {
@@ -206,7 +243,7 @@ describe('resource simulator model', () => {
             simulatedReplicas: 3,
             containers: [container('app', { cpuRequestCores: 1, memoryRequestGiB: 2 })],
             pvcCount: 3,
-            pvcStorageGiB: 30,
+            pvcStorageGiB: 10,
           }),
           id: 'temp-1',
           name: 'load-test',
@@ -296,7 +333,7 @@ describe('resource simulator model', () => {
               simulatedReplicas: 4,
               containers: [container('kafka', { cpuRequestCores: 1, memoryRequestGiB: 10 })],
               pvcCount: 4,
-              pvcStorageGiB: 3200,
+              pvcStorageGiB: 800,
             },
             {
               id: 'metrics/metrics-controller',
