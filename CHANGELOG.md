@@ -1,3 +1,10 @@
+## [1.9.3](https://github.com/elohmeier/grafana-k8s-app/compare/v1.9.2...v1.9.3) (2026-05-12)
+
+
+### Bug Fixes
+
+* improve pvc storage handling / ux ([bc7131d](https://github.com/elohmeier/grafana-k8s-app/commit/bc7131d1b1d7152453a9c2d949989a9cfaf3cb4c))
+
 ## [1.9.2](https://github.com/elohmeier/grafana-k8s-app/compare/v1.9.1...v1.9.2) (2026-05-12)
 
 
