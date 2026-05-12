@@ -18,8 +18,13 @@ function sample(refId: string, labels: Record<string, string>, value: number): M
 const deploymentLabels = { workload: 'api', workload_type: 'deployment' };
 const statefulSetLabels = { workload: 'db', workload_type: 'statefulset' };
 
-function scenario(overrides: WorkloadScenarioState['overrides'] = {}, tempRows: WorkloadScenarioState['tempRows'] = []) {
-  return JSON.parse(serializeScenario({ overrides, tempRows })) as WorkloadScenarioState;
+function scenario(
+  overrides: WorkloadScenarioState['overrides'] = {},
+  tempRows: WorkloadScenarioState['tempRows'] = []
+) {
+  return JSON.parse(
+    serializeScenario({ overrides, tempRows, kafkaOverrides: {}, tempKafkaRows: [] })
+  ) as WorkloadScenarioState;
 }
 
 function container(name: string, values: Partial<WorkloadContainerValues> = {}): WorkloadContainerValues {
@@ -76,9 +81,7 @@ describe('resource simulator model', () => {
   });
 
   it('treats zero-replica workloads as scaled-to-zero instead of missing baselines', () => {
-    const baseline = buildBaseline([
-      sample('workloadReplicas', deploymentLabels, 0),
-    ]);
+    const baseline = buildBaseline([sample('workloadReplicas', deploymentLabels, 0)]);
     const results = calculateSimulatorResults(baseline, scenario());
     const workload = results.workloadRows.find((row) => row.id === 'deployment/api');
 
@@ -246,6 +249,84 @@ describe('resource simulator model', () => {
     });
   });
 
+  it('models existing Strimzi Kafka broker and controller pools', () => {
+    const baseline = buildBaseline([
+      sample('quota', { resource: 'pods', type: 'used' }, 20),
+      sample('quota', { resource: 'pods', type: 'hard' }, 40),
+      sample('kafkaPods', { kafka: 'metrics', pool: 'metrics-broker', role: 'broker' }, 3),
+      sample('kafkaPods', { kafka: 'metrics', pool: 'metrics-controller', role: 'controller' }, 3),
+      sample('kafkaContainers', { kafka: 'metrics', pool: 'metrics-broker', role: 'broker', container: 'kafka' }, 3),
+      sample(
+        'kafkaContainers',
+        { kafka: 'metrics', pool: 'metrics-controller', role: 'controller', container: 'kafka' },
+        3
+      ),
+      sample(
+        'kafkaRequests',
+        { kafka: 'metrics', pool: 'metrics-broker', role: 'broker', container: 'kafka', resource: 'cpu' },
+        3
+      ),
+      sample(
+        'kafkaRequests',
+        { kafka: 'metrics', pool: 'metrics-controller', role: 'controller', container: 'kafka', resource: 'cpu' },
+        0.6
+      ),
+      sample(
+        'kafkaRequests',
+        { kafka: 'metrics', pool: 'metrics-broker', role: 'broker', container: 'kafka', resource: 'memory' },
+        30 * BYTES_PER_GIB
+      ),
+      sample(
+        'kafkaRequests',
+        { kafka: 'metrics', pool: 'metrics-controller', role: 'controller', container: 'kafka', resource: 'memory' },
+        3 * BYTES_PER_GIB
+      ),
+      sample('kafkaPvcCount', { kafka: 'metrics', pool: 'metrics-broker', role: 'broker' }, 3),
+      sample('kafkaPvcStorage', { kafka: 'metrics', pool: 'metrics-broker', role: 'broker' }, 2400 * BYTES_PER_GIB),
+    ]);
+    const results = calculateSimulatorResults(baseline, {
+      ...scenario(),
+      kafkaOverrides: {
+        metrics: {
+          pools: [
+            {
+              id: 'metrics/metrics-broker',
+              name: 'metrics-broker',
+              role: 'broker',
+              simulatedReplicas: 4,
+              containers: [container('kafka', { cpuRequestCores: 1, memoryRequestGiB: 10 })],
+              pvcCount: 4,
+              pvcStorageGiB: 3200,
+            },
+            {
+              id: 'metrics/metrics-controller',
+              name: 'metrics-controller',
+              role: 'controller',
+              simulatedReplicas: 3,
+              containers: [container('kafka', { cpuRequestCores: 0.2, memoryRequestGiB: 1 })],
+              pvcCount: 0,
+              pvcStorageGiB: 0,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(results.kafkaRows).toHaveLength(1);
+    expect(results.kafkaRows[0]).toMatchObject({
+      id: 'metrics',
+      currentReplicas: 6,
+      simulatedReplicas: 7,
+      simulatedPvcCount: 4,
+    });
+    expect(results.deltas.pods).toBe(1);
+    expect(results.deltas.cpuRequests).toBeCloseTo(1);
+    expect(results.deltas.memoryRequests).toBe(10 * BYTES_PER_GIB);
+    expect(results.deltas.pvcCount).toBe(1);
+    expect(results.deltas.pvcStorage).toBe(800 * BYTES_PER_GIB);
+    expect(results.rows.find((row) => row.key === 'pods')?.projected).toBe(21);
+  });
+
   it('marks exceeded hard limits and treats missing quota hard limits as unlimited', () => {
     const baseline = buildBaseline([
       sample('quota', { resource: 'requests.cpu', type: 'used' }, 9),
@@ -272,7 +353,9 @@ describe('resource simulator model', () => {
       remaining: undefined,
       status: 'unlimited',
     });
-    expect(results.warnings).not.toContain('Some quota hard limits are missing; those rows are shown as unknown rather than failed.');
+    expect(results.warnings).not.toContain(
+      'Some quota hard limits are missing; those rows are shown as unknown rather than failed.'
+    );
   });
 
   it('keeps missing capacity hard values unknown', () => {
@@ -286,7 +369,7 @@ describe('resource simulator model', () => {
   });
 
   it('normalizes malformed URL scenario state', () => {
-    expect(parseScenario('not json')).toEqual({ overrides: {}, tempRows: [] });
+    expect(parseScenario('not json')).toEqual({ overrides: {}, tempRows: [], kafkaOverrides: {}, tempKafkaRows: [] });
 
     const parsed = parseScenario(
       JSON.stringify({
@@ -342,7 +425,9 @@ describe('resource simulator model', () => {
       id: 'temp-1',
       name: 'temp-1',
       type: 'deployment',
-      containers: [container('worker', { cpuRequestCores: 0.25, cpuLimitCores: 0.5, memoryRequestGiB: 1, memoryLimitGiB: 2 })],
+      containers: [
+        container('worker', { cpuRequestCores: 0.25, cpuLimitCores: 0.5, memoryRequestGiB: 1, memoryLimitGiB: 2 }),
+      ],
     });
   });
 });

@@ -1,6 +1,7 @@
 export const BYTES_PER_GIB = 1024 ** 3;
 
 export type WorkloadType = 'deployment' | 'statefulset';
+export type KafkaPoolRole = 'broker' | 'controller';
 
 export type WorkloadContainerValues = {
   name: string;
@@ -26,11 +27,15 @@ export type WorkloadScenarioRow = WorkloadEditableValues & {
 export type WorkloadScenarioState = {
   overrides: Record<string, WorkloadEditableValues>;
   tempRows: WorkloadScenarioRow[];
+  kafkaOverrides: Record<string, KafkaEditableValues>;
+  tempKafkaRows: KafkaScenarioRow[];
 };
 
 export const DEFAULT_WORKLOAD_SCENARIO: WorkloadScenarioState = {
   overrides: {},
   tempRows: [],
+  kafkaOverrides: {},
+  tempKafkaRows: [],
 };
 
 export const DEFAULT_WORKLOAD_CONTAINER_VALUES: WorkloadContainerValues = {
@@ -46,6 +51,44 @@ export const DEFAULT_WORKLOAD_VALUES: WorkloadEditableValues = {
   containers: [{ ...DEFAULT_WORKLOAD_CONTAINER_VALUES }],
   pvcCount: 0,
   pvcStorageGiB: 0,
+};
+
+export type KafkaPoolEditableValues = WorkloadEditableValues & {
+  id: string;
+  name: string;
+  role: KafkaPoolRole;
+};
+
+export type KafkaEditableValues = {
+  pools: KafkaPoolEditableValues[];
+};
+
+export type KafkaScenarioRow = KafkaEditableValues & {
+  id: string;
+  name: string;
+};
+
+export const DEFAULT_KAFKA_VALUES: KafkaEditableValues = {
+  pools: [
+    {
+      id: 'broker',
+      name: 'broker',
+      role: 'broker',
+      simulatedReplicas: 3,
+      containers: [{ name: 'kafka', cpuRequestCores: 1, cpuLimitCores: 0, memoryRequestGiB: 10, memoryLimitGiB: 10 }],
+      pvcCount: 3,
+      pvcStorageGiB: 800,
+    },
+    {
+      id: 'controller',
+      name: 'controller',
+      role: 'controller',
+      simulatedReplicas: 3,
+      containers: [{ name: 'kafka', cpuRequestCores: 0.2, cpuLimitCores: 0, memoryRequestGiB: 1, memoryLimitGiB: 1 }],
+      pvcCount: 3,
+      pvcStorageGiB: 5,
+    },
+  ],
 };
 
 export type MetricSample = {
@@ -84,9 +127,31 @@ export type WorkloadBaseline = {
   currentPvcStorageBytes: number;
 };
 
+export type KafkaPoolBaseline = {
+  id: string;
+  name: string;
+  role: KafkaPoolRole;
+  currentReplicas: number;
+  currentContainers: number;
+  containerBaselines: WorkloadContainerBaseline[];
+  currentCpuRequests: number;
+  currentCpuLimits: number;
+  currentMemoryRequests: number;
+  currentMemoryLimits: number;
+  currentPvcCount: number;
+  currentPvcStorageBytes: number;
+};
+
+export type KafkaInstanceBaseline = {
+  id: string;
+  name: string;
+  pools: KafkaPoolBaseline[];
+};
+
 export type SimulatorBaseline = {
   quotas: Record<string, ResourceQuotaPair>;
   workloads: WorkloadBaseline[];
+  kafkaInstances: KafkaInstanceBaseline[];
   clusterAllocatable: Record<string, number>;
 };
 
@@ -97,6 +162,35 @@ export type WorkloadSimulationRow = WorkloadBaseline &
     isScaledToZero: boolean;
     missingResourceBaseline: boolean;
   };
+
+export type KafkaPoolSimulationRow = KafkaPoolBaseline &
+  WorkloadEditableValues & {
+    changed: boolean;
+    missingResourceBaseline: boolean;
+  };
+
+export type KafkaSimulationRow = {
+  id: string;
+  name: string;
+  pools: KafkaPoolSimulationRow[];
+  isTemporary: boolean;
+  changed: boolean;
+  currentReplicas: number;
+  simulatedReplicas: number;
+  currentCpuRequests: number;
+  currentCpuLimits: number;
+  currentMemoryRequests: number;
+  currentMemoryLimits: number;
+  currentPvcCount: number;
+  currentPvcStorageBytes: number;
+  simulatedCpuRequests: number;
+  simulatedCpuLimits: number;
+  simulatedMemoryRequests: number;
+  simulatedMemoryLimits: number;
+  simulatedPvcCount: number;
+  simulatedPvcStorageBytes: number;
+  missingResourceBaseline: boolean;
+};
 
 export type SimulatorRowStatus = 'ok' | 'warning' | 'exceeded' | 'unlimited' | 'unknown';
 export type SimulatorRowUnit = 'count' | 'cores' | 'bytes';
@@ -127,12 +221,17 @@ export type WorkloadDelta = {
   pvcStorage: number;
   deploymentObjects: number;
   statefulSetObjects: number;
+  configMapObjects: number;
+  secretObjects: number;
+  serviceObjects: number;
 };
 
 export type SimulatorResults = {
   rows: SimulatorResultRow[];
   workloadRows: WorkloadSimulationRow[];
+  kafkaRows: KafkaSimulationRow[];
   workloadDeltas: Record<string, WorkloadDelta>;
+  kafkaDeltas: Record<string, WorkloadDelta>;
   warnings: string[];
   deltas: Omit<WorkloadDelta, 'rowId'>;
 };
@@ -147,6 +246,10 @@ function workloadId(type: WorkloadType, name: string) {
 
 function workloadTypeFromLabel(value?: string): WorkloadType | undefined {
   return value === 'deployment' || value === 'statefulset' ? value : undefined;
+}
+
+function kafkaPoolRoleFromLabel(value?: string): KafkaPoolRole | undefined {
+  return value === 'broker' || value === 'controller' ? value : undefined;
 }
 
 function ensureWorkload(map: Map<string, WorkloadBaseline>, labels: Record<string, string>) {
@@ -182,7 +285,51 @@ function ensureWorkload(map: Map<string, WorkloadBaseline>, labels: Record<strin
   return workload;
 }
 
-function ensureContainer(workload: WorkloadBaseline, name: string) {
+function ensureKafkaPool(map: Map<string, KafkaInstanceBaseline>, labels: Record<string, string>) {
+  const kafkaName = labels.kafka;
+  const poolName = labels.pool;
+  const role = kafkaPoolRoleFromLabel(labels.role);
+
+  if (!kafkaName || !poolName || !role) {
+    return undefined;
+  }
+
+  let instance = map.get(kafkaName);
+
+  if (!instance) {
+    instance = {
+      id: kafkaName,
+      name: kafkaName,
+      pools: [],
+    };
+    map.set(kafkaName, instance);
+  }
+
+  const poolId = `${kafkaName}/${poolName}`;
+  let pool = instance.pools.find((candidate) => candidate.id === poolId);
+
+  if (!pool) {
+    pool = {
+      id: poolId,
+      name: poolName,
+      role,
+      currentReplicas: 0,
+      currentContainers: 0,
+      containerBaselines: [],
+      currentCpuRequests: 0,
+      currentCpuLimits: 0,
+      currentMemoryRequests: 0,
+      currentMemoryLimits: 0,
+      currentPvcCount: 0,
+      currentPvcStorageBytes: 0,
+    };
+    instance.pools.push(pool);
+  }
+
+  return pool;
+}
+
+function ensureContainer(workload: { containerBaselines: WorkloadContainerBaseline[] }, name: string) {
   const containerName = name.trim();
 
   if (!containerName) {
@@ -209,6 +356,7 @@ function ensureContainer(workload: WorkloadBaseline, name: string) {
 export function buildBaseline(samples: MetricSample[]): SimulatorBaseline {
   const quotas: Record<string, ResourceQuotaPair> = {};
   const workloads = new Map<string, WorkloadBaseline>();
+  const kafkaInstances = new Map<string, KafkaInstanceBaseline>();
   const clusterAllocatable: Record<string, number> = {};
 
   for (const sample of samples) {
@@ -237,6 +385,51 @@ export function buildBaseline(samples: MetricSample[]): SimulatorBaseline {
       if (resource) {
         clusterAllocatable[resource] = (clusterAllocatable[resource] ?? 0) + sample.value;
       }
+      continue;
+    }
+
+    if (sample.refId.startsWith('kafka')) {
+      const pool = ensureKafkaPool(kafkaInstances, sample.labels);
+
+      if (!pool) {
+        continue;
+      }
+
+      const container = sample.labels.container ? ensureContainer(pool, sample.labels.container) : undefined;
+
+      if (sample.refId === 'kafkaPods') {
+        pool.currentReplicas += sample.value;
+      } else if (sample.refId === 'kafkaContainers') {
+        pool.currentContainers += sample.value;
+        if (container) {
+          container.currentInstances += sample.value;
+        }
+      } else if (sample.refId === 'kafkaRequests' && sample.labels.resource === 'cpu') {
+        pool.currentCpuRequests += sample.value;
+        if (container) {
+          container.currentCpuRequests += sample.value;
+        }
+      } else if (sample.refId === 'kafkaRequests' && sample.labels.resource === 'memory') {
+        pool.currentMemoryRequests += sample.value;
+        if (container) {
+          container.currentMemoryRequests += sample.value;
+        }
+      } else if (sample.refId === 'kafkaLimits' && sample.labels.resource === 'cpu') {
+        pool.currentCpuLimits += sample.value;
+        if (container) {
+          container.currentCpuLimits += sample.value;
+        }
+      } else if (sample.refId === 'kafkaLimits' && sample.labels.resource === 'memory') {
+        pool.currentMemoryLimits += sample.value;
+        if (container) {
+          container.currentMemoryLimits += sample.value;
+        }
+      } else if (sample.refId === 'kafkaPvcCount') {
+        pool.currentPvcCount += sample.value;
+      } else if (sample.refId === 'kafkaPvcStorage') {
+        pool.currentPvcStorageBytes += sample.value;
+      }
+
       continue;
     }
 
@@ -284,15 +477,28 @@ export function buildBaseline(samples: MetricSample[]): SimulatorBaseline {
     }
   }
 
-  const workloadRows = Array.from(workloads.values()).sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
+  const workloadRows = Array.from(workloads.values()).sort(
+    (a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name)
+  );
 
   for (const workload of workloadRows) {
     workload.containerBaselines.sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  const kafkaRows = Array.from(kafkaInstances.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const kafka of kafkaRows) {
+    kafka.pools.sort((a, b) => a.role.localeCompare(b.role) || a.name.localeCompare(b.name));
+
+    for (const pool of kafka.pools) {
+      pool.containerBaselines.sort((a, b) => a.name.localeCompare(b.name));
+    }
+  }
+
   return {
     quotas,
     workloads: workloadRows,
+    kafkaInstances: kafkaRows,
     clusterAllocatable,
   };
 }
@@ -317,6 +523,8 @@ export function serializeScenario(scenario: WorkloadScenarioState) {
 export function normalizeScenario(scenario: Partial<WorkloadScenarioState> = {}): WorkloadScenarioState {
   const overrides: Record<string, WorkloadEditableValues> = {};
   const tempRows: WorkloadScenarioRow[] = [];
+  const kafkaOverrides: Record<string, KafkaEditableValues> = {};
+  const tempKafkaRows: KafkaScenarioRow[] = [];
 
   for (const [id, values] of Object.entries(scenario.overrides ?? {})) {
     const normalized = normalizeEditableValues(values);
@@ -342,7 +550,29 @@ export function normalizeScenario(scenario: Partial<WorkloadScenarioState> = {})
     });
   }
 
-  return { overrides, tempRows };
+  for (const [id, values] of Object.entries(scenario.kafkaOverrides ?? {})) {
+    const normalized = normalizeKafkaEditableValues(values);
+
+    if (normalized) {
+      kafkaOverrides[id] = normalized;
+    }
+  }
+
+  for (const row of scenario.tempKafkaRows ?? []) {
+    const normalized = normalizeKafkaEditableValues(row);
+
+    if (!normalized || !row.id) {
+      continue;
+    }
+
+    tempKafkaRows.push({
+      ...normalized,
+      id: String(row.id),
+      name: String(row.name || row.id),
+    });
+  }
+
+  return { overrides, tempRows, kafkaOverrides, tempKafkaRows };
 }
 
 function normalizeEditableValues(values?: Partial<WorkloadEditableValues>) {
@@ -356,6 +586,32 @@ function normalizeEditableValues(values?: Partial<WorkloadEditableValues>) {
     pvcCount: Math.max(0, numberOrDefault(values.pvcCount, 0)),
     pvcStorageGiB: Math.max(0, numberOrDefault(values.pvcStorageGiB, 0)),
   };
+}
+
+function normalizeKafkaEditableValues(values?: Partial<KafkaEditableValues>) {
+  if (!values || !Array.isArray(values.pools)) {
+    return undefined;
+  }
+
+  const pools = values.pools.flatMap((pool, index) => {
+    const normalized = normalizeEditableValues(pool);
+    const role = kafkaPoolRoleFromLabel(pool?.role);
+
+    if (!normalized || !role || !pool?.id) {
+      return [];
+    }
+
+    return [
+      {
+        ...normalized,
+        id: String(pool.id),
+        name: String(pool.name || pool.id || `pool-${index + 1}`),
+        role,
+      },
+    ];
+  });
+
+  return pools.length > 0 ? { pools } : undefined;
 }
 
 function normalizeContainers(containers: WorkloadEditableValues['containers'] | undefined) {
@@ -424,14 +680,34 @@ function editableDefaults(workload: WorkloadBaseline): WorkloadEditableValues {
   };
 }
 
-export function buildWorkloadRows(baseline: SimulatorBaseline, scenario: WorkloadScenarioState): WorkloadSimulationRow[] {
+function editableDefaultsFromPool(pool: KafkaPoolBaseline): KafkaPoolEditableValues {
+  return {
+    ...editableDefaults({
+      ...pool,
+      type: 'statefulset',
+      currentPods: pool.currentReplicas,
+    }),
+    id: pool.id,
+    name: pool.name,
+    role: pool.role,
+  };
+}
+
+export function buildWorkloadRows(
+  baseline: SimulatorBaseline,
+  scenario: WorkloadScenarioState
+): WorkloadSimulationRow[] {
   const rows = baseline.workloads.map((workload) => {
     const defaults = editableDefaults(workload);
     const override = scenario.overrides[workload.id];
     const values = override ?? defaults;
-    const isScaledToZero = workload.currentReplicas === 0 && workload.currentPods === 0 && workload.currentContainers === 0;
+    const isScaledToZero =
+      workload.currentReplicas === 0 && workload.currentPods === 0 && workload.currentContainers === 0;
     const hasResourceBaseline =
-      workload.currentCpuRequests > 0 || workload.currentMemoryRequests > 0 || workload.currentCpuLimits > 0 || workload.currentMemoryLimits > 0;
+      workload.currentCpuRequests > 0 ||
+      workload.currentMemoryRequests > 0 ||
+      workload.currentCpuLimits > 0 ||
+      workload.currentMemoryLimits > 0;
 
     return {
       ...workload,
@@ -464,6 +740,114 @@ export function buildWorkloadRows(baseline: SimulatorBaseline, scenario: Workloa
   }
 
   return rows;
+}
+
+export function buildKafkaRows(baseline: SimulatorBaseline, scenario: WorkloadScenarioState): KafkaSimulationRow[] {
+  const rows = baseline.kafkaInstances.map((instance) => {
+    const override = scenario.kafkaOverrides[instance.id];
+    const pools = instance.pools.map((pool) => {
+      const defaults = editableDefaultsFromPool(pool);
+      const values = override?.pools.find((candidate) => candidate.id === pool.id) ?? defaults;
+      const hasResourceBaseline =
+        pool.currentCpuRequests > 0 ||
+        pool.currentMemoryRequests > 0 ||
+        pool.currentCpuLimits > 0 ||
+        pool.currentMemoryLimits > 0;
+
+      return {
+        ...pool,
+        ...values,
+        changed: Boolean(override),
+        missingResourceBaseline: pool.currentReplicas > 0 && (pool.currentContainers === 0 || !hasResourceBaseline),
+      };
+    });
+
+    return kafkaSimulationRow(instance.id, instance.name, pools, false);
+  });
+
+  for (const temp of scenario.tempKafkaRows) {
+    rows.push(
+      kafkaSimulationRow(
+        temp.id,
+        temp.name,
+        temp.pools.map((pool) => ({
+          ...pool,
+          currentReplicas: 0,
+          currentContainers: 0,
+          containerBaselines: [],
+          currentCpuRequests: 0,
+          currentCpuLimits: 0,
+          currentMemoryRequests: 0,
+          currentMemoryLimits: 0,
+          currentPvcCount: 0,
+          currentPvcStorageBytes: 0,
+          changed: true,
+          missingResourceBaseline: false,
+        })),
+        true
+      )
+    );
+  }
+
+  return rows;
+}
+
+function kafkaSimulationRow(
+  id: string,
+  name: string,
+  pools: KafkaPoolSimulationRow[],
+  isTemporary: boolean
+): KafkaSimulationRow {
+  const totals = pools.reduce(
+    (acc, pool) => {
+      const podTotals = containerResourceTotals(pool.containers);
+
+      return {
+        currentReplicas: acc.currentReplicas + pool.currentReplicas,
+        simulatedReplicas: acc.simulatedReplicas + pool.simulatedReplicas,
+        currentCpuRequests: acc.currentCpuRequests + pool.currentCpuRequests,
+        currentCpuLimits: acc.currentCpuLimits + pool.currentCpuLimits,
+        currentMemoryRequests: acc.currentMemoryRequests + pool.currentMemoryRequests,
+        currentMemoryLimits: acc.currentMemoryLimits + pool.currentMemoryLimits,
+        currentPvcCount: acc.currentPvcCount + pool.currentPvcCount,
+        currentPvcStorageBytes: acc.currentPvcStorageBytes + pool.currentPvcStorageBytes,
+        simulatedCpuRequests: acc.simulatedCpuRequests + pool.simulatedReplicas * podTotals.cpuRequests,
+        simulatedCpuLimits: acc.simulatedCpuLimits + pool.simulatedReplicas * podTotals.cpuLimits,
+        simulatedMemoryRequests:
+          acc.simulatedMemoryRequests + pool.simulatedReplicas * podTotals.memoryRequests * BYTES_PER_GIB,
+        simulatedMemoryLimits:
+          acc.simulatedMemoryLimits + pool.simulatedReplicas * podTotals.memoryLimits * BYTES_PER_GIB,
+        simulatedPvcCount: acc.simulatedPvcCount + pool.pvcCount,
+        simulatedPvcStorageBytes: acc.simulatedPvcStorageBytes + pool.pvcStorageGiB * BYTES_PER_GIB,
+      };
+    },
+    {
+      currentReplicas: 0,
+      simulatedReplicas: 0,
+      currentCpuRequests: 0,
+      currentCpuLimits: 0,
+      currentMemoryRequests: 0,
+      currentMemoryLimits: 0,
+      currentPvcCount: 0,
+      currentPvcStorageBytes: 0,
+      simulatedCpuRequests: 0,
+      simulatedCpuLimits: 0,
+      simulatedMemoryRequests: 0,
+      simulatedMemoryLimits: 0,
+      simulatedPvcCount: 0,
+      simulatedPvcStorageBytes: 0,
+    }
+  );
+
+  return {
+    id,
+    name,
+    pools,
+    isTemporary,
+    changed: isTemporary || pools.some((pool) => pool.changed),
+    missingResourceBaseline: pools.some((pool) => pool.missingResourceBaseline),
+    ...totals,
+  };
 }
 
 export function containerResourceTotals(containers: WorkloadContainerValues[]) {
@@ -503,6 +887,9 @@ function workloadDelta(row: WorkloadSimulationRow): WorkloadDelta {
     pvcStorage: simulatedPvcStorage - row.currentPvcStorageBytes,
     deploymentObjects: row.isTemporary && row.type === 'deployment' ? 1 : 0,
     statefulSetObjects: row.isTemporary && row.type === 'statefulset' ? 1 : 0,
+    configMapObjects: 0,
+    secretObjects: 0,
+    serviceObjects: 0,
   };
 }
 
@@ -518,6 +905,9 @@ function fallbackTotals(workloads: WorkloadBaseline[]) {
       pvcStorage: totals.pvcStorage + workload.currentPvcStorageBytes,
       deploymentObjects: totals.deploymentObjects + (workload.type === 'deployment' ? 1 : 0),
       statefulSetObjects: totals.statefulSetObjects + (workload.type === 'statefulset' ? 1 : 0),
+      configMapObjects: totals.configMapObjects,
+      secretObjects: totals.secretObjects,
+      serviceObjects: totals.serviceObjects,
     }),
     {
       pods: 0,
@@ -529,8 +919,81 @@ function fallbackTotals(workloads: WorkloadBaseline[]) {
       pvcStorage: 0,
       deploymentObjects: 0,
       statefulSetObjects: 0,
+      configMapObjects: 0,
+      secretObjects: 0,
+      serviceObjects: 0,
     }
   );
+}
+
+function kafkaFallbackTotals(kafkaInstances: KafkaInstanceBaseline[]) {
+  return kafkaInstances
+    .flatMap((instance) => instance.pools)
+    .reduce(
+      (totals, pool) => ({
+        pods: totals.pods + pool.currentReplicas,
+        cpuRequests: totals.cpuRequests + pool.currentCpuRequests,
+        cpuLimits: totals.cpuLimits + pool.currentCpuLimits,
+        memoryRequests: totals.memoryRequests + pool.currentMemoryRequests,
+        memoryLimits: totals.memoryLimits + pool.currentMemoryLimits,
+        pvcCount: totals.pvcCount + pool.currentPvcCount,
+        pvcStorage: totals.pvcStorage + pool.currentPvcStorageBytes,
+        deploymentObjects: totals.deploymentObjects,
+        statefulSetObjects: totals.statefulSetObjects,
+        configMapObjects: totals.configMapObjects,
+        secretObjects: totals.secretObjects,
+        serviceObjects: totals.serviceObjects,
+      }),
+      {
+        pods: 0,
+        cpuRequests: 0,
+        cpuLimits: 0,
+        memoryRequests: 0,
+        memoryLimits: 0,
+        pvcCount: 0,
+        pvcStorage: 0,
+        deploymentObjects: 0,
+        statefulSetObjects: 0,
+        configMapObjects: 0,
+        secretObjects: 0,
+        serviceObjects: 0,
+      }
+    );
+}
+
+function addTotals(left: Omit<WorkloadDelta, 'rowId'>, right: Omit<WorkloadDelta, 'rowId'>) {
+  return {
+    pods: left.pods + right.pods,
+    cpuRequests: left.cpuRequests + right.cpuRequests,
+    cpuLimits: left.cpuLimits + right.cpuLimits,
+    memoryRequests: left.memoryRequests + right.memoryRequests,
+    memoryLimits: left.memoryLimits + right.memoryLimits,
+    pvcCount: left.pvcCount + right.pvcCount,
+    pvcStorage: left.pvcStorage + right.pvcStorage,
+    deploymentObjects: left.deploymentObjects + right.deploymentObjects,
+    statefulSetObjects: left.statefulSetObjects + right.statefulSetObjects,
+    configMapObjects: left.configMapObjects + right.configMapObjects,
+    secretObjects: left.secretObjects + right.secretObjects,
+    serviceObjects: left.serviceObjects + right.serviceObjects,
+  };
+}
+
+function kafkaDelta(row: KafkaSimulationRow): WorkloadDelta {
+  return {
+    rowId: row.id,
+    pods: row.simulatedReplicas - row.currentReplicas,
+    cpuRequests: row.simulatedCpuRequests - row.currentCpuRequests,
+    cpuLimits: row.simulatedCpuLimits - row.currentCpuLimits,
+    memoryRequests: row.simulatedMemoryRequests - row.currentMemoryRequests,
+    memoryLimits: row.simulatedMemoryLimits - row.currentMemoryLimits,
+    pvcCount: row.simulatedPvcCount - row.currentPvcCount,
+    pvcStorage: row.simulatedPvcStorageBytes - row.currentPvcStorageBytes,
+    deploymentObjects: row.isTemporary ? 2 : 0,
+    statefulSetObjects: 0,
+    configMapObjects: row.isTemporary ? 2 : 0,
+    secretObjects: row.isTemporary ? 6 : 0,
+    serviceObjects: row.isTemporary ? 4 : 0,
+  };
 }
 
 function quotaValue(baseline: SimulatorBaseline, resource: string, type: keyof ResourceQuotaPair) {
@@ -539,7 +1002,11 @@ function quotaValue(baseline: SimulatorBaseline, resource: string, type: keyof R
 }
 
 function quotaBaseline(baseline: SimulatorBaseline, resource: string, fallback: number, secondaryResource?: string) {
-  return quotaValue(baseline, resource, 'used') ?? (secondaryResource ? quotaValue(baseline, secondaryResource, 'used') : undefined) ?? fallback;
+  return (
+    quotaValue(baseline, resource, 'used') ??
+    (secondaryResource ? quotaValue(baseline, secondaryResource, 'used') : undefined) ??
+    fallback
+  );
 }
 
 function hardValue(baseline: SimulatorBaseline, ...resources: string[]) {
@@ -603,9 +1070,11 @@ export function calculateSimulatorResults(
   scenario: WorkloadScenarioState
 ): SimulatorResults {
   const workloadRows = buildWorkloadRows(baseline, scenario);
+  const kafkaRows = buildKafkaRows(baseline, scenario);
   const workloadDeltas = Object.fromEntries(workloadRows.map((row) => [row.id, workloadDelta(row)]));
-  const fallback = fallbackTotals(baseline.workloads);
-  const deltas = Object.values(workloadDeltas).reduce(
+  const kafkaDeltas = Object.fromEntries(kafkaRows.map((row) => [row.id, kafkaDelta(row)]));
+  const fallback = addTotals(fallbackTotals(baseline.workloads), kafkaFallbackTotals(baseline.kafkaInstances));
+  const deltas = [...Object.values(workloadDeltas), ...Object.values(kafkaDeltas)].reduce(
     (totals, delta) => ({
       pods: totals.pods + delta.pods,
       cpuRequests: totals.cpuRequests + delta.cpuRequests,
@@ -616,6 +1085,9 @@ export function calculateSimulatorResults(
       pvcStorage: totals.pvcStorage + delta.pvcStorage,
       deploymentObjects: totals.deploymentObjects + delta.deploymentObjects,
       statefulSetObjects: totals.statefulSetObjects + delta.statefulSetObjects,
+      configMapObjects: totals.configMapObjects + delta.configMapObjects,
+      secretObjects: totals.secretObjects + delta.secretObjects,
+      serviceObjects: totals.serviceObjects + delta.serviceObjects,
     }),
     {
       pods: 0,
@@ -627,6 +1099,9 @@ export function calculateSimulatorResults(
       pvcStorage: 0,
       deploymentObjects: 0,
       statefulSetObjects: 0,
+      configMapObjects: 0,
+      secretObjects: 0,
+      serviceObjects: 0,
     }
   );
 
@@ -718,7 +1193,7 @@ export function calculateSimulatorResults(
       'count',
       'quota',
       quotaBaseline(baseline, 'count/configmaps', 0),
-      0,
+      deltas.configMapObjects,
       hardValue(baseline, 'count/configmaps')
     ),
     resultRow(
@@ -727,8 +1202,17 @@ export function calculateSimulatorResults(
       'count',
       'quota',
       quotaBaseline(baseline, 'count/secrets', 0),
-      0,
+      deltas.secretObjects,
       hardValue(baseline, 'count/secrets')
+    ),
+    resultRow(
+      'count/services',
+      'Service objects',
+      'count',
+      'quota',
+      quotaBaseline(baseline, 'count/services', 0),
+      deltas.serviceObjects,
+      hardValue(baseline, 'count/services')
     ),
     resultRow(
       'cluster.requests.cpu',
@@ -762,27 +1246,49 @@ export function calculateSimulatorResults(
   return {
     rows,
     workloadRows,
+    kafkaRows,
     workloadDeltas,
-    warnings: buildWarnings(rows, workloadRows, baseline),
+    kafkaDeltas,
+    warnings: buildWarnings(rows, workloadRows, kafkaRows, baseline),
     deltas,
   };
 }
 
-function buildWarnings(rows: SimulatorResultRow[], workloadRows: WorkloadSimulationRow[], baseline: SimulatorBaseline) {
+function buildWarnings(
+  rows: SimulatorResultRow[],
+  workloadRows: WorkloadSimulationRow[],
+  kafkaRows: KafkaSimulationRow[],
+  baseline: SimulatorBaseline
+) {
   const warnings: string[] = [];
   const exceeded = rows.filter((row) => row.status === 'exceeded');
   const missingBaselineRows = workloadRows.filter((row) => !row.isTemporary && row.missingResourceBaseline);
+  const missingKafkaBaselineRows = kafkaRows.filter((row) => !row.isTemporary && row.missingResourceBaseline);
 
   if (exceeded.length > 0) {
-    warnings.push(`${exceeded.length} projected resource ${exceeded.length === 1 ? 'limit is' : 'limits are'} exceeded.`);
+    warnings.push(
+      `${exceeded.length} projected resource ${exceeded.length === 1 ? 'limit is' : 'limits are'} exceeded.`
+    );
   }
 
-  if (baseline.quotas.pods?.used === undefined && baseline.quotas['count/pods']?.used === undefined && baseline.workloads.length > 0) {
+  if (
+    baseline.quotas.pods?.used === undefined &&
+    baseline.quotas['count/pods']?.used === undefined &&
+    baseline.workloads.length > 0
+  ) {
     warnings.push('Pod baseline is using workload replica metrics because pod quota usage is not available.');
   }
 
   if (missingBaselineRows.length > 0) {
-    warnings.push(`${missingBaselineRows.length} workload ${missingBaselineRows.length === 1 ? 'row has' : 'rows have'} missing resource baselines.`);
+    warnings.push(
+      `${missingBaselineRows.length} workload ${missingBaselineRows.length === 1 ? 'row has' : 'rows have'} missing resource baselines.`
+    );
+  }
+
+  if (missingKafkaBaselineRows.length > 0) {
+    warnings.push(
+      `${missingKafkaBaselineRows.length} Kafka ${missingKafkaBaselineRows.length === 1 ? 'row has' : 'rows have'} missing resource baselines.`
+    );
   }
 
   return warnings;

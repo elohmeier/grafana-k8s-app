@@ -9,10 +9,27 @@ import {
   SceneObjectUrlValues,
   SceneQueryRunner,
 } from '@grafana/scenes';
-import { Alert, Badge, Button, Combobox, ComboboxOption, IconButton, Input, LoadingPlaceholder, Stack, useStyles2 } from '@grafana/ui';
+import {
+  Alert,
+  Badge,
+  Button,
+  Combobox,
+  ComboboxOption,
+  IconButton,
+  Input,
+  LoadingPlaceholder,
+  Stack,
+  useStyles2,
+} from '@grafana/ui';
 import { prometheusDatasource } from '../../queries/datasources';
 import {
   simulatorClusterAllocatableQuery,
+  simulatorKafkaContainersQuery,
+  simulatorKafkaLimitsQuery,
+  simulatorKafkaPodsQuery,
+  simulatorKafkaPvcCountQuery,
+  simulatorKafkaPvcStorageQuery,
+  simulatorKafkaRequestsQuery,
   simulatorQuotaQuery,
   simulatorWorkloadContainersQuery,
   simulatorWorkloadLimitsQuery,
@@ -26,8 +43,14 @@ import {
   buildBaseline,
   calculateSimulatorResults,
   containerResourceTotals,
+  DEFAULT_KAFKA_VALUES,
   DEFAULT_WORKLOAD_SCENARIO,
   DEFAULT_WORKLOAD_VALUES,
+  KafkaEditableValues,
+  KafkaPoolEditableValues,
+  KafkaPoolSimulationRow,
+  KafkaScenarioRow,
+  KafkaSimulationRow,
   MetricSample,
   parseScenario,
   serializeScenario,
@@ -125,6 +148,44 @@ export class ResourceSimulatorObject extends SceneObjectBase<ResourceSimulatorSt
     });
   };
 
+  public updateExistingKafka = (row: KafkaSimulationRow, patch: KafkaEditableValues) => {
+    this.updateScenario((scenario) => ({
+      ...scenario,
+      kafkaOverrides: {
+        ...scenario.kafkaOverrides,
+        [row.id]: patch,
+      },
+    }));
+  };
+
+  public updateTempKafka = (row: KafkaSimulationRow, patch: Partial<KafkaScenarioRow>) => {
+    this.updateScenario((scenario) => ({
+      ...scenario,
+      tempKafkaRows: scenario.tempKafkaRows.map((tempRow) =>
+        tempRow.id === row.id ? { ...tempRow, ...patch } : tempRow
+      ),
+    }));
+  };
+
+  public addTempKafka = () => {
+    this.updateScenario((scenario) => {
+      const nextNumber = scenario.tempKafkaRows.length + 1;
+      const id = `temp-kafka-${Date.now().toString(36)}-${nextNumber}`;
+
+      return {
+        ...scenario,
+        tempKafkaRows: [
+          ...scenario.tempKafkaRows,
+          {
+            ...DEFAULT_KAFKA_VALUES,
+            id,
+            name: `temp-kafka-${nextNumber}`,
+          },
+        ],
+      };
+    });
+  };
+
   public removeTempRow = (row: WorkloadSimulationRow) => {
     this.updateScenario((scenario) => ({
       ...scenario,
@@ -142,6 +203,20 @@ export class ResourceSimulatorObject extends SceneObjectBase<ResourceSimulatorSt
         : {
             ...scenario,
             overrides: Object.fromEntries(Object.entries(scenario.overrides).filter(([id]) => id !== row.id)),
+          }
+    );
+  };
+
+  public resetKafka = (row: KafkaSimulationRow) => {
+    this.updateScenario((scenario) =>
+      row.isTemporary
+        ? {
+            ...scenario,
+            tempKafkaRows: scenario.tempKafkaRows.filter((tempRow) => tempRow.id !== row.id),
+          }
+        : {
+            ...scenario,
+            kafkaOverrides: Object.fromEntries(Object.entries(scenario.kafkaOverrides).filter(([id]) => id !== row.id)),
           }
     );
   };
@@ -216,6 +291,48 @@ function simulatorDataRunner() {
         range: false,
       },
       {
+        refId: 'kafkaPods',
+        expr: simulatorKafkaPodsQuery(),
+        format: 'time_series',
+        instant: true,
+        range: false,
+      },
+      {
+        refId: 'kafkaContainers',
+        expr: simulatorKafkaContainersQuery(),
+        format: 'time_series',
+        instant: true,
+        range: false,
+      },
+      {
+        refId: 'kafkaRequests',
+        expr: simulatorKafkaRequestsQuery(),
+        format: 'time_series',
+        instant: true,
+        range: false,
+      },
+      {
+        refId: 'kafkaLimits',
+        expr: simulatorKafkaLimitsQuery(),
+        format: 'time_series',
+        instant: true,
+        range: false,
+      },
+      {
+        refId: 'kafkaPvcCount',
+        expr: simulatorKafkaPvcCountQuery(),
+        format: 'time_series',
+        instant: true,
+        range: false,
+      },
+      {
+        refId: 'kafkaPvcStorage',
+        expr: simulatorKafkaPvcStorageQuery(),
+        format: 'time_series',
+        instant: true,
+        range: false,
+      },
+      {
         refId: 'allocatable',
         expr: simulatorClusterAllocatableQuery(),
         format: 'time_series',
@@ -242,7 +359,9 @@ function ResourceSimulatorRenderer({ model }: SceneComponentProps<ResourceSimula
       <Stack direction="column" gap={2}>
         <div>
           <h2 className={styles.title}>Resource Simulator</h2>
-          <p className={styles.subtitle}>Edit existing workloads or add temporary planned workloads to model quota impact.</p>
+          <p className={styles.subtitle}>
+            Edit existing workloads or add temporary planned workloads to model quota impact.
+          </p>
         </div>
 
         {loading && <LoadingPlaceholder text="Loading live workload baseline..." />}
@@ -261,7 +380,8 @@ function ResourceSimulatorRenderer({ model }: SceneComponentProps<ResourceSimula
 
         <div className={styles.summaryGrid}>
           {summaryRows(results.rows).map((summary) => {
-            const progressWidth = summary.ratio === undefined ? undefined : `${Math.min(100, Math.max(0, summary.ratio * 100))}%`;
+            const progressWidth =
+              summary.ratio === undefined ? undefined : `${Math.min(100, Math.max(0, summary.ratio * 100))}%`;
 
             return (
               <div className={`${styles.summary} ${summaryStatusClass(styles, summary.status)}`} key={summary.key}>
@@ -275,7 +395,10 @@ function ResourceSimulatorRenderer({ model }: SceneComponentProps<ResourceSimula
                 </span>
                 {progressWidth !== undefined && (
                   <div className={styles.summaryProgress} aria-label={`${formatUsageValue(summary)} used`}>
-                    <div className={`${styles.summaryProgressFill} ${progressStatusClass(styles, summary.status)}`} style={{ width: progressWidth }} />
+                    <div
+                      className={`${styles.summaryProgressFill} ${progressStatusClass(styles, summary.status)}`}
+                      style={{ width: progressWidth }}
+                    />
                   </div>
                 )}
                 <span className={styles.summaryHelp}>{formatRemainingSummary(summary)}</span>
@@ -287,8 +410,33 @@ function ResourceSimulatorRenderer({ model }: SceneComponentProps<ResourceSimula
         <div className={styles.section}>
           <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} wrap="wrap">
             <div>
+              <h3 className={styles.sectionTitle}>Kafka instances</h3>
+              <p className={styles.sectionText}>
+                Rows are seeded from Strimzi broker and controller pools. Helper Deployments remain in the workload
+                table.
+              </p>
+            </div>
+            <Button variant="secondary" icon="plus" onClick={model.addTempKafka}>
+              Add Kafka
+            </Button>
+          </Stack>
+
+          {results.kafkaRows.length === 0 ? (
+            <Alert title="No Kafka rows" severity="info">
+              No Strimzi Kafka broker or controller pool metrics were returned for the current namespace.
+            </Alert>
+          ) : (
+            <KafkaTable model={model} rows={results.kafkaRows} deltas={results.kafkaDeltas} />
+          )}
+        </div>
+
+        <div className={styles.section}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} wrap="wrap">
+            <div>
               <h3 className={styles.sectionTitle}>Workloads</h3>
-              <p className={styles.sectionText}>Existing rows are seeded from live Deployment and StatefulSet metrics. Temporary rows are additive only.</p>
+              <p className={styles.sectionText}>
+                Existing rows are seeded from live Deployment and StatefulSet metrics. Temporary rows are additive only.
+              </p>
             </div>
             <Stack direction="row" gap={1} wrap="wrap">
               <Button variant="secondary" icon="plus" onClick={model.addTempWorkload}>
@@ -302,7 +450,8 @@ function ResourceSimulatorRenderer({ model }: SceneComponentProps<ResourceSimula
 
           {results.workloadRows.length === 0 ? (
             <Alert title="No workload rows" severity="info">
-              No live Deployment or StatefulSet metrics were returned for the current namespace. Add a temporary workload to model a planned change.
+              No live Deployment or StatefulSet metrics were returned for the current namespace. Add a temporary
+              workload to model a planned change.
             </Alert>
           ) : (
             <WorkloadTable model={model} rows={results.workloadRows} deltas={results.workloadDeltas} />
@@ -314,6 +463,248 @@ function ResourceSimulatorRenderer({ model }: SceneComponentProps<ResourceSimula
           <ResultTable rows={results.rows} />
         </div>
       </Stack>
+    </div>
+  );
+}
+
+function KafkaTable({
+  model,
+  rows,
+  deltas,
+}: {
+  model: ResourceSimulatorObject;
+  rows: KafkaSimulationRow[];
+  deltas: Record<string, ReturnType<typeof calculateSimulatorResults>['kafkaDeltas'][string]>;
+}) {
+  const styles = useStyles2(getStyles);
+  const [expandedRows, setExpandedRows] = React.useState<Record<string, boolean>>({});
+
+  return (
+    <div className={styles.tableWrap}>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th>Kafka</th>
+            <th>Current pods</th>
+            <th>Sim pods</th>
+            <th>CPU req</th>
+            <th>CPU limit</th>
+            <th>Mem req</th>
+            <th>Mem limit</th>
+            <th>PVCs</th>
+            <th>PVC storage</th>
+            <th>Delta</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const delta = deltas[row.id];
+            const expanded = Boolean(expandedRows[row.id]);
+            const togglePools = () => setExpandedRows((current) => ({ ...current, [row.id]: !current[row.id] }));
+
+            return (
+              <React.Fragment key={row.id}>
+                <tr>
+                  <td className={styles.workloadCell}>
+                    <div className={styles.workloadInline}>
+                      <IconButton
+                        aria-expanded={expanded}
+                        aria-label={`${expanded ? 'Collapse pools for' : 'Expand pools for'} ${row.name}`}
+                        className={styles.collapseButton}
+                        name={expanded ? 'angle-down' : 'angle-right'}
+                        size="sm"
+                        onClick={togglePools}
+                      />
+                      {row.isTemporary ? (
+                        <Input
+                          aria-label="Temporary Kafka name"
+                          value={row.name}
+                          width={24}
+                          onChange={(event) => model.updateTempKafka(row, { name: event.currentTarget.value })}
+                        />
+                      ) : (
+                        <strong>{row.name}</strong>
+                      )}
+                    </div>
+                  </td>
+                  <td>{row.currentReplicas}</td>
+                  <td>{row.simulatedReplicas}</td>
+                  <td>{formatCpuQuantity(row.simulatedCpuRequests)}</td>
+                  <td>{formatCpuQuantity(row.simulatedCpuLimits)}</td>
+                  <td>{formatValue(row.simulatedMemoryRequests, 'bytes')}</td>
+                  <td>{formatValue(row.simulatedMemoryLimits, 'bytes')}</td>
+                  <td>{row.simulatedPvcCount}</td>
+                  <td>{formatValue(row.simulatedPvcStorageBytes, 'bytes')}</td>
+                  <td className={styles.deltaCell}>{formatWorkloadDelta(delta)}</td>
+                  <td>
+                    {row.missingResourceBaseline ? (
+                      <Badge color="orange" text="Missing baseline" />
+                    ) : row.changed ? (
+                      <Badge color="blue" text="Edited" />
+                    ) : (
+                      <Badge color="green" text="Live" />
+                    )}
+                  </td>
+                  <td>
+                    <Button variant="secondary" size="sm" onClick={() => model.resetKafka(row)}>
+                      {row.isTemporary ? 'Remove' : 'Reset'}
+                    </Button>
+                  </td>
+                </tr>
+                {expanded && (
+                  <tr className={styles.detailRow}>
+                    <td colSpan={12}>
+                      <KafkaPoolEditor
+                        row={row}
+                        onChange={(pools) =>
+                          row.isTemporary
+                            ? model.updateTempKafka(row, { pools })
+                            : model.updateExistingKafka(row, { pools })
+                        }
+                      />
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function KafkaPoolEditor({
+  row,
+  onChange,
+}: {
+  row: KafkaSimulationRow;
+  onChange: (pools: KafkaPoolEditableValues[]) => void;
+}) {
+  const styles = useStyles2(getStyles);
+  const updatePool = (pool: KafkaPoolSimulationRow, patch: Partial<WorkloadEditableValues>) => {
+    onChange(
+      row.pools.map((candidate) =>
+        candidate.id === pool.id ? kafkaPoolValues({ ...candidate, ...patch }) : kafkaPoolValues(candidate)
+      )
+    );
+  };
+
+  return (
+    <div className={styles.containerEditor}>
+      <strong>Pools</strong>
+      <table className={styles.nestedTable}>
+        <thead>
+          <tr>
+            <th>Pool</th>
+            <th>Role</th>
+            <th>Current pods</th>
+            <th>Sim pods</th>
+            <th>Pod CPU req</th>
+            <th>Pod CPU limit</th>
+            <th>Pod mem req</th>
+            <th>Pod mem limit</th>
+            <th>PVCs</th>
+            <th>PVC storage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {row.pools.map((pool) => {
+            const podTotals = containerResourceTotals(pool.containers);
+
+            return (
+              <tr key={pool.id}>
+                <td>{pool.name}</td>
+                <td>{formatKafkaRole(pool.role)}</td>
+                <td>{pool.currentReplicas}</td>
+                <td>
+                  <CountStepper
+                    decreaseLabel={`Decrease ${pool.name} replicas in ${row.name}`}
+                    increaseLabel={`Increase ${pool.name} replicas in ${row.name}`}
+                    label={`Simulated ${pool.name} replicas in ${row.name}`}
+                    value={pool.simulatedReplicas}
+                    min={0}
+                    step={1}
+                    onChange={(value) => updatePool(pool, { simulatedReplicas: value })}
+                  />
+                </td>
+                <td>
+                  <QuantityInput
+                    label={`CPU request for ${pool.name} in ${row.name}`}
+                    value={podTotals.cpuRequests}
+                    formatter={formatCpuQuantity}
+                    parser={parseCpuQuantityToCores}
+                    onChange={(value) =>
+                      updatePool(pool, {
+                        containers: updateSingleContainer(pool.containers, { cpuRequestCores: value }),
+                      })
+                    }
+                  />
+                </td>
+                <td>
+                  <QuantityInput
+                    label={`CPU limit for ${pool.name} in ${row.name}`}
+                    value={podTotals.cpuLimits}
+                    formatter={formatCpuQuantity}
+                    parser={parseCpuQuantityToCores}
+                    onChange={(value) =>
+                      updatePool(pool, { containers: updateSingleContainer(pool.containers, { cpuLimitCores: value }) })
+                    }
+                  />
+                </td>
+                <td>
+                  <QuantityInput
+                    label={`Memory request for ${pool.name} in ${row.name}`}
+                    value={podTotals.memoryRequests}
+                    formatter={formatGiBQuantity}
+                    parser={parseByteQuantityToGiB}
+                    onChange={(value) =>
+                      updatePool(pool, {
+                        containers: updateSingleContainer(pool.containers, { memoryRequestGiB: value }),
+                      })
+                    }
+                  />
+                </td>
+                <td>
+                  <QuantityInput
+                    label={`Memory limit for ${pool.name} in ${row.name}`}
+                    value={podTotals.memoryLimits}
+                    formatter={formatGiBQuantity}
+                    parser={parseByteQuantityToGiB}
+                    onChange={(value) =>
+                      updatePool(pool, {
+                        containers: updateSingleContainer(pool.containers, { memoryLimitGiB: value }),
+                      })
+                    }
+                  />
+                </td>
+                <td>
+                  <CountStepper
+                    decreaseLabel={`Decrease ${pool.name} PVCs in ${row.name}`}
+                    increaseLabel={`Increase ${pool.name} PVCs in ${row.name}`}
+                    label={`PVC count for ${pool.name} in ${row.name}`}
+                    value={pool.pvcCount}
+                    min={0}
+                    step={1}
+                    onChange={(value) => updatePool(pool, { pvcCount: value })}
+                  />
+                </td>
+                <td>
+                  <QuantityInput
+                    label={`PVC storage for ${pool.name} in ${row.name}`}
+                    value={pool.pvcStorageGiB}
+                    formatter={formatGiBQuantity}
+                    parser={parseByteQuantityToGiB}
+                    onChange={(value) => updatePool(pool, { pvcStorageGiB: value })}
+                  />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -486,16 +877,25 @@ function ContainerEditor({
 }) {
   const styles = useStyles2(getStyles);
   const updateContainer = (index: number, patch: Partial<WorkloadContainerValues>) => {
-    onChange(containers.map((container, containerIndex) => (containerIndex === index ? { ...container, ...patch } : container)));
+    onChange(
+      containers.map((container, containerIndex) => (containerIndex === index ? { ...container, ...patch } : container))
+    );
   };
   const addContainer = () => onChange([...containers, emptyContainer(containers)]);
-  const removeContainer = (index: number) => onChange(containers.filter((_, containerIndex) => containerIndex !== index));
+  const removeContainer = (index: number) =>
+    onChange(containers.filter((_, containerIndex) => containerIndex !== index));
 
   return (
     <div className={styles.containerEditor}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} wrap="wrap">
         <strong>Containers</strong>
-        <Button variant="secondary" size="sm" icon="plus" aria-label={`Add container for ${row.name}`} onClick={addContainer}>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon="plus"
+          aria-label={`Add container for ${row.name}`}
+          onClick={addContainer}
+        >
           Add container
         </Button>
       </Stack>
@@ -561,7 +961,12 @@ function ContainerEditor({
                   />
                 </td>
                 <td>
-                  <Button variant="secondary" size="sm" disabled={containers.length <= 1} onClick={() => removeContainer(index)}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={containers.length <= 1}
+                    onClick={() => removeContainer(index)}
+                  >
                     Remove
                   </Button>
                 </td>
@@ -786,8 +1191,25 @@ function editableValues(row: WorkloadSimulationRow): WorkloadEditableValues {
   };
 }
 
+function kafkaPoolValues(pool: KafkaPoolSimulationRow): KafkaPoolEditableValues {
+  return {
+    id: pool.id,
+    name: pool.name,
+    role: pool.role,
+    simulatedReplicas: pool.simulatedReplicas,
+    containers: pool.containers.map((container) => ({ ...container })),
+    pvcCount: pool.pvcCount,
+    pvcStorageGiB: pool.pvcStorageGiB,
+  };
+}
+
+function updateSingleContainer(containers: WorkloadContainerValues[], patch: Partial<WorkloadContainerValues>) {
+  const [first, ...rest] = containers.length > 0 ? containers : [{ ...DEFAULT_WORKLOAD_VALUES.containers[0] }];
+  return [{ ...first, ...patch }, ...rest];
+}
+
 function firstUrlValue(value: SceneObjectUrlValues[string]) {
-  return Array.isArray(value) ? value[0] : value ?? undefined;
+  return Array.isArray(value) ? value[0] : (value ?? undefined);
 }
 
 function clampNumber(value: number, min: number) {
@@ -885,12 +1307,19 @@ function summaryRows(rows: SimulatorResultRow[]) {
     'count/persistentvolumeclaims',
     'count/configmaps',
     'count/secrets',
+    'count/services',
   ];
-  return keys.map((key) => rows.find((resultRow) => resultRow.key === key)).filter((row): row is SimulatorResultRow => Boolean(row));
+  return keys
+    .map((key) => rows.find((resultRow) => resultRow.key === key))
+    .filter((row): row is SimulatorResultRow => Boolean(row));
 }
 
 function formatWorkloadType(type: WorkloadType) {
   return WORKLOAD_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type;
+}
+
+function formatKafkaRole(role: KafkaPoolSimulationRow['role']) {
+  return role === 'broker' ? 'Broker' : 'Controller';
 }
 
 function formatContainerCount(row: WorkloadSimulationRow) {
@@ -905,9 +1334,12 @@ function formatContainerCount(row: WorkloadSimulationRow) {
   }
 
   const liveContainersPerPod = row.currentContainers / row.currentPods;
-  return `${plannedCount} / ${formatValue(row.currentContainers, 'count')} live, ${liveContainersPerPod.toLocaleString(undefined, {
-    maximumFractionDigits: 2,
-  })} per Pod`;
+  return `${plannedCount} / ${formatValue(row.currentContainers, 'count')} live, ${liveContainersPerPod.toLocaleString(
+    undefined,
+    {
+      maximumFractionDigits: 2,
+    }
+  )} per Pod`;
 }
 
 function formatWorkloadDelta(delta?: ReturnType<typeof calculateSimulatorResults>['workloadDeltas'][string]) {
@@ -985,7 +1417,9 @@ function formatLimitValue(row: SimulatorResultRow) {
 
 function formatRemainingValue(row: SimulatorResultRow) {
   if (row.remaining !== undefined) {
-    return row.remaining < 0 ? `${formatValue(Math.abs(row.remaining), row.unit)} over` : formatValue(row.remaining, row.unit);
+    return row.remaining < 0
+      ? `${formatValue(Math.abs(row.remaining), row.unit)} over`
+      : formatValue(row.remaining, row.unit);
   }
 
   return row.status === 'unlimited' ? 'Unlimited' : '-';
@@ -993,7 +1427,9 @@ function formatRemainingValue(row: SimulatorResultRow) {
 
 function formatRemainingSummary(row: SimulatorResultRow) {
   if (row.remaining !== undefined) {
-    return row.remaining < 0 ? `${formatValue(Math.abs(row.remaining), row.unit)} over` : `${formatValue(row.remaining, row.unit)} remaining`;
+    return row.remaining < 0
+      ? `${formatValue(Math.abs(row.remaining), row.unit)} over`
+      : `${formatValue(row.remaining, row.unit)} remaining`;
   }
 
   if (row.status === 'unlimited') {
