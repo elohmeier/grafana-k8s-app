@@ -1,3 +1,10 @@
+## [1.9.2](https://github.com/elohmeier/grafana-k8s-app/compare/v1.9.1...v1.9.2) (2026-05-12)
+
+
+### Bug Fixes
+
+* fix kafka query issue ([31c2283](https://github.com/elohmeier/grafana-k8s-app/commit/31c228375d82ec5b4611a14c4f599e39302e7023))
+
 ## [1.9.1](https://github.com/elohmeier/grafana-k8s-app/compare/v1.9.0...v1.9.1) (2026-05-12)
 
 
