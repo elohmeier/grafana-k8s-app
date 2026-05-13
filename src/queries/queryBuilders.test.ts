@@ -26,14 +26,20 @@ import {
 } from './resources';
 import {
   simulatorClusterAllocatableQuery,
+  simulatorKafkaCpuUsageQuery,
+  simulatorKafkaMemoryUsageQuery,
   simulatorKafkaPvcCountQuery,
   simulatorKafkaPvcStorageQuery,
+  simulatorKafkaPvcUsedQuery,
   simulatorQuotaQuery,
   simulatorWorkloadContainersQuery,
+  simulatorWorkloadCpuUsageQuery,
   simulatorWorkloadLimitsQuery,
+  simulatorWorkloadMemoryUsageQuery,
   simulatorWorkloadPodsQuery,
   simulatorWorkloadPvcCountQuery,
   simulatorWorkloadPvcStorageQuery,
+  simulatorWorkloadPvcUsedQuery,
   simulatorWorkloadReplicasQuery,
   simulatorWorkloadRequestsQuery,
 } from './resourceSimulator';
@@ -209,6 +215,24 @@ describe('resource simulator query builders', () => {
     expect(requestsQuery).toContain('namespace=~"ns1"');
   });
 
+  it('queries workload live usage through owner and PVC joins', () => {
+    const cpuQuery = compact(simulatorWorkloadCpuUsageQuery({ cluster: 'c1', namespace: 'ns1' }));
+    const memoryQuery = compact(simulatorWorkloadMemoryUsageQuery({ cluster: 'c1', namespace: 'ns1' }));
+    const pvcQuery = compact(simulatorWorkloadPvcUsedQuery({ cluster: 'c1', namespace: 'ns1' }));
+
+    expect(cpuQuery).toContain('container_cpu_usage_seconds_total');
+    expect(cpuQuery).toContain('[5m]');
+    expect(cpuQuery).toContain('sum by (cluster, namespace, workload, workload_type, container)');
+    expect(cpuQuery).toContain('namespace_workload_pod:kube_pod_owner:relabel');
+    expect(cpuQuery).not.toMatch(/container_cpu_usage_seconds_total\{[^}]*workload=/);
+    expect(memoryQuery).toContain('container_memory_working_set_bytes');
+    expect(memoryQuery).toContain('group_left(workload, workload_type)');
+    expect(pvcQuery).toContain('kubelet_volume_stats_used_bytes');
+    expect(pvcQuery).toContain('kube_pod_spec_volumes_persistentvolumeclaims_info');
+    expect(pvcQuery).toContain('group_right()');
+    expect(pvcQuery).not.toMatch(/kubelet_volume_stats_used_bytes\{[^}]*workload=/);
+  });
+
   it('queries workload PVC count and storage baselines through pod volume joins', () => {
     const countQuery = compact(simulatorWorkloadPvcCountQuery({ cluster: 'c1', namespace: 'ns1' }));
     const storageQuery = compact(simulatorWorkloadPvcStorageQuery({ cluster: 'c1', namespace: 'ns1' }));
@@ -225,13 +249,22 @@ describe('resource simulator query builders', () => {
   });
 
   it('requires explicit PVC labels in Kafka PVC joins', () => {
+    const cpuQuery = compact(simulatorKafkaCpuUsageQuery({ cluster: 'c1', namespace: 'ns1' }));
+    const memoryQuery = compact(simulatorKafkaMemoryUsageQuery({ cluster: 'c1', namespace: 'ns1' }));
     const countQuery = compact(simulatorKafkaPvcCountQuery({ cluster: 'c1', namespace: 'ns1' }));
     const storageQuery = compact(simulatorKafkaPvcStorageQuery({ cluster: 'c1', namespace: 'ns1' }));
+    const usedQuery = compact(simulatorKafkaPvcUsedQuery({ cluster: 'c1', namespace: 'ns1' }));
 
+    expect(cpuQuery).toContain('container_cpu_usage_seconds_total');
+    expect(cpuQuery).toContain('group_left(kafka, pool, role)');
+    expect(memoryQuery).toContain('container_memory_working_set_bytes');
+    expect(memoryQuery).toContain('label_strimzi_io_cluster');
     expect(countQuery).toContain('persistentvolumeclaim=~".+"');
     expect(storageQuery).toContain('persistentvolumeclaim=~".+"');
     expect(storageQuery).toContain('group_left(kafka, pool, role)');
     expect(storageQuery).toContain('group_left(kafka, pool, role) (');
+    expect(usedQuery).toContain('kubelet_volume_stats_used_bytes');
+    expect(usedQuery).toContain('group_left(kafka, pool, role)');
     expect(storageQuery).not.toContain('persistentvolumeclaim!=""');
   });
 

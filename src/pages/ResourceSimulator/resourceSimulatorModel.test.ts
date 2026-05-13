@@ -62,6 +62,11 @@ describe('resource simulator model', () => {
       sample('workloadRequests', { ...deploymentLabels, container: 'sidecar', resource: 'cpu' }, 1.5),
       sample('workloadRequests', { ...deploymentLabels, container: 'app', resource: 'memory' }, 3 * BYTES_PER_GIB),
       sample('workloadRequests', { ...deploymentLabels, container: 'sidecar', resource: 'memory' }, 3 * BYTES_PER_GIB),
+      sample('workloadCpuUsage', { ...deploymentLabels, container: 'app' }, 0.25),
+      sample('workloadCpuUsage', { ...deploymentLabels, container: 'sidecar' }, 0.05),
+      sample('workloadMemoryUsage', { ...deploymentLabels, container: 'app' }, 2 * BYTES_PER_GIB),
+      sample('workloadMemoryUsage', { ...deploymentLabels, container: 'sidecar' }, 0.5 * BYTES_PER_GIB),
+      sample('workloadPvcUsed', deploymentLabels, 4 * BYTES_PER_GIB),
     ]);
     const results = calculateSimulatorResults(baseline, scenario());
     const workload = results.workloadRows.find((row) => row.id === 'deployment/api');
@@ -71,6 +76,13 @@ describe('resource simulator model', () => {
     expect(workload?.simulatedReplicas).toBe(3);
     expect(workload?.currentContainers).toBe(6);
     expect(workload?.containerBaselines.map((container) => container.name)).toEqual(['app', 'sidecar']);
+    expect(workload?.currentCpuUsage).toBeCloseTo(0.3);
+    expect(workload?.currentMemoryWorkingSet).toBe(2.5 * BYTES_PER_GIB);
+    expect(workload?.currentPvcUsedBytes).toBe(4 * BYTES_PER_GIB);
+    expect(workload?.containerBaselines.find((container) => container.name === 'app')).toMatchObject({
+      currentCpuUsage: 0.25,
+      currentMemoryWorkingSet: 2 * BYTES_PER_GIB,
+    });
     expect(workload?.containers).toEqual([
       container('app', { cpuRequestCores: 0.5, memoryRequestGiB: 1 }),
       container('sidecar', { cpuRequestCores: 0.5, memoryRequestGiB: 1 }),
@@ -320,6 +332,13 @@ describe('resource simulator model', () => {
       ),
       sample('kafkaPvcCount', { kafka: 'metrics', pool: 'metrics-broker', role: 'broker' }, 3),
       sample('kafkaPvcStorage', { kafka: 'metrics', pool: 'metrics-broker', role: 'broker' }, 2400 * BYTES_PER_GIB),
+      sample('kafkaCpuUsage', { kafka: 'metrics', pool: 'metrics-broker', role: 'broker', container: 'kafka' }, 1.2),
+      sample(
+        'kafkaMemoryUsage',
+        { kafka: 'metrics', pool: 'metrics-broker', role: 'broker', container: 'kafka' },
+        18 * BYTES_PER_GIB
+      ),
+      sample('kafkaPvcUsed', { kafka: 'metrics', pool: 'metrics-broker', role: 'broker' }, 1200 * BYTES_PER_GIB),
     ]);
     const results = calculateSimulatorResults(baseline, {
       ...scenario(),
@@ -353,6 +372,9 @@ describe('resource simulator model', () => {
     expect(results.kafkaRows[0]).toMatchObject({
       id: 'metrics',
       currentReplicas: 6,
+      currentCpuUsage: 1.2,
+      currentMemoryWorkingSet: 18 * BYTES_PER_GIB,
+      currentPvcUsedBytes: 1200 * BYTES_PER_GIB,
       simulatedReplicas: 7,
       simulatedPvcCount: 4,
     });

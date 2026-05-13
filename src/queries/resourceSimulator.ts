@@ -124,6 +124,36 @@ sum by (cluster, namespace, workload, workload_type, container, resource) (
 `;
 }
 
+export function simulatorWorkloadCpuUsageQuery(scope: EntityScope = {}) {
+  return `
+sum by (cluster, namespace, workload, workload_type, container) (
+  rate(container_cpu_usage_seconds_total{
+    ${simulatorMatchers(scope)},
+    pod!="",
+    container!="",
+    container!="POD"
+  }[5m])
+  * on (cluster, namespace, pod) group_left(workload, workload_type)
+  ${workloadOwnerSelector(scope)}
+)
+`;
+}
+
+export function simulatorWorkloadMemoryUsageQuery(scope: EntityScope = {}) {
+  return `
+sum by (cluster, namespace, workload, workload_type, container) (
+  container_memory_working_set_bytes{
+    ${simulatorMatchers(scope)},
+    pod!="",
+    container!="",
+    container!="POD"
+  }
+  * on (cluster, namespace, pod) group_left(workload, workload_type)
+  ${workloadOwnerSelector(scope)}
+)
+`;
+}
+
 function workloadPvcSelector(scope: EntityScope = {}) {
   return `
 group by (cluster, namespace, workload, workload_type, persistentvolumeclaim) (
@@ -134,6 +164,21 @@ group by (cluster, namespace, workload, workload_type, persistentvolumeclaim) (
   }
   * on (cluster, namespace, pod) group_left(workload, workload_type)
   ${workloadOwnerSelector(scope)}
+)
+`;
+}
+
+export function simulatorWorkloadPvcUsedQuery(scope: EntityScope = {}) {
+  return `
+sum by (cluster, namespace, workload, workload_type) (
+  max by (cluster, namespace, persistentvolumeclaim) (
+    kubelet_volume_stats_used_bytes{
+      ${simulatorMatchers(scope)},
+      persistentvolumeclaim=~".+"
+    }
+  )
+  * on (cluster, namespace, persistentvolumeclaim) group_right()
+  ${workloadPvcSelector(scope)}
 )
 `;
 }
@@ -263,6 +308,36 @@ sum by (cluster, namespace, kafka, pool, role, container, resource) (
 `;
 }
 
+export function simulatorKafkaCpuUsageQuery(scope: EntityScope = {}) {
+  return `
+sum by (cluster, namespace, kafka, pool, role, container) (
+  rate(container_cpu_usage_seconds_total{
+    ${simulatorMatchers(scope)},
+    pod!="",
+    container!="",
+    container!="POD"
+  }[5m])
+  * on (cluster, namespace, pod) group_left(kafka, pool, role)
+  (${kafkaPoolPodSelector(scope)})
+)
+`;
+}
+
+export function simulatorKafkaMemoryUsageQuery(scope: EntityScope = {}) {
+  return `
+sum by (cluster, namespace, kafka, pool, role, container) (
+  container_memory_working_set_bytes{
+    ${simulatorMatchers(scope)},
+    pod!="",
+    container!="",
+    container!="POD"
+  }
+  * on (cluster, namespace, pod) group_left(kafka, pool, role)
+  (${kafkaPoolPodSelector(scope)})
+)
+`;
+}
+
 function kafkaPvcSelector(scope: EntityScope = {}) {
   return `
 group by (cluster, namespace, kafka, pool, role, persistentvolumeclaim) (
@@ -273,6 +348,21 @@ group by (cluster, namespace, kafka, pool, role, persistentvolumeclaim) (
   }
   * on (cluster, namespace, pod) group_left(kafka, pool, role)
   (${kafkaPoolPodSelector(scope)})
+)
+`;
+}
+
+export function simulatorKafkaPvcUsedQuery(scope: EntityScope = {}) {
+  return `
+sum by (cluster, namespace, kafka, pool, role) (
+  max by (cluster, namespace, persistentvolumeclaim) (
+    kubelet_volume_stats_used_bytes{
+      ${simulatorMatchers(scope)},
+      persistentvolumeclaim=~".+"
+    }
+  )
+  * on (cluster, namespace, persistentvolumeclaim) group_left(kafka, pool, role)
+  ${kafkaPvcSelector(scope)}
 )
 `;
 }

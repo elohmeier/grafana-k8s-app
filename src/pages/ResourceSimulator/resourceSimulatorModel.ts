@@ -109,6 +109,8 @@ export type WorkloadContainerBaseline = {
   currentCpuLimits: number;
   currentMemoryRequests: number;
   currentMemoryLimits: number;
+  currentCpuUsage: number;
+  currentMemoryWorkingSet: number;
 };
 
 export type WorkloadBaseline = {
@@ -123,8 +125,11 @@ export type WorkloadBaseline = {
   currentCpuLimits: number;
   currentMemoryRequests: number;
   currentMemoryLimits: number;
+  currentCpuUsage: number;
+  currentMemoryWorkingSet: number;
   currentPvcCount: number;
   currentPvcStorageBytes: number;
+  currentPvcUsedBytes: number;
 };
 
 export type KafkaPoolBaseline = {
@@ -138,8 +143,11 @@ export type KafkaPoolBaseline = {
   currentCpuLimits: number;
   currentMemoryRequests: number;
   currentMemoryLimits: number;
+  currentCpuUsage: number;
+  currentMemoryWorkingSet: number;
   currentPvcCount: number;
   currentPvcStorageBytes: number;
+  currentPvcUsedBytes: number;
 };
 
 export type KafkaInstanceBaseline = {
@@ -181,8 +189,11 @@ export type KafkaSimulationRow = {
   currentCpuLimits: number;
   currentMemoryRequests: number;
   currentMemoryLimits: number;
+  currentCpuUsage: number;
+  currentMemoryWorkingSet: number;
   currentPvcCount: number;
   currentPvcStorageBytes: number;
+  currentPvcUsedBytes: number;
   simulatedCpuRequests: number;
   simulatedCpuLimits: number;
   simulatedMemoryRequests: number;
@@ -276,8 +287,11 @@ function ensureWorkload(map: Map<string, WorkloadBaseline>, labels: Record<strin
       currentCpuLimits: 0,
       currentMemoryRequests: 0,
       currentMemoryLimits: 0,
+      currentCpuUsage: 0,
+      currentMemoryWorkingSet: 0,
       currentPvcCount: 0,
       currentPvcStorageBytes: 0,
+      currentPvcUsedBytes: 0,
     };
     map.set(id, workload);
   }
@@ -320,8 +334,11 @@ function ensureKafkaPool(map: Map<string, KafkaInstanceBaseline>, labels: Record
       currentCpuLimits: 0,
       currentMemoryRequests: 0,
       currentMemoryLimits: 0,
+      currentCpuUsage: 0,
+      currentMemoryWorkingSet: 0,
       currentPvcCount: 0,
       currentPvcStorageBytes: 0,
+      currentPvcUsedBytes: 0,
     };
     instance.pools.push(pool);
   }
@@ -346,6 +363,8 @@ function ensureContainer(workload: { containerBaselines: WorkloadContainerBaseli
       currentCpuLimits: 0,
       currentMemoryRequests: 0,
       currentMemoryLimits: 0,
+      currentCpuUsage: 0,
+      currentMemoryWorkingSet: 0,
     };
     workload.containerBaselines.push(container);
   }
@@ -424,10 +443,22 @@ export function buildBaseline(samples: MetricSample[]): SimulatorBaseline {
         if (container) {
           container.currentMemoryLimits += sample.value;
         }
+      } else if (sample.refId === 'kafkaCpuUsage') {
+        pool.currentCpuUsage += sample.value;
+        if (container) {
+          container.currentCpuUsage += sample.value;
+        }
+      } else if (sample.refId === 'kafkaMemoryUsage') {
+        pool.currentMemoryWorkingSet += sample.value;
+        if (container) {
+          container.currentMemoryWorkingSet += sample.value;
+        }
       } else if (sample.refId === 'kafkaPvcCount') {
         pool.currentPvcCount += sample.value;
       } else if (sample.refId === 'kafkaPvcStorage') {
         pool.currentPvcStorageBytes += sample.value;
+      } else if (sample.refId === 'kafkaPvcUsed') {
+        pool.currentPvcUsedBytes += sample.value;
       }
 
       continue;
@@ -470,10 +501,22 @@ export function buildBaseline(samples: MetricSample[]): SimulatorBaseline {
       if (container) {
         container.currentMemoryLimits += sample.value;
       }
+    } else if (sample.refId === 'workloadCpuUsage') {
+      workload.currentCpuUsage += sample.value;
+      if (container) {
+        container.currentCpuUsage += sample.value;
+      }
+    } else if (sample.refId === 'workloadMemoryUsage') {
+      workload.currentMemoryWorkingSet += sample.value;
+      if (container) {
+        container.currentMemoryWorkingSet += sample.value;
+      }
     } else if (sample.refId === 'workloadPvcCount') {
       workload.currentPvcCount += sample.value;
     } else if (sample.refId === 'workloadPvcStorage') {
       workload.currentPvcStorageBytes += sample.value;
+    } else if (sample.refId === 'workloadPvcUsed') {
+      workload.currentPvcUsedBytes += sample.value;
     }
   }
 
@@ -759,8 +802,11 @@ export function buildWorkloadRows(
       currentCpuLimits: 0,
       currentMemoryRequests: 0,
       currentMemoryLimits: 0,
+      currentCpuUsage: 0,
+      currentMemoryWorkingSet: 0,
       currentPvcCount: 0,
       currentPvcStorageBytes: 0,
+      currentPvcUsedBytes: 0,
       isTemporary: true,
       changed: true,
       isScaledToZero: false,
@@ -808,8 +854,11 @@ export function buildKafkaRows(baseline: SimulatorBaseline, scenario: WorkloadSc
           currentCpuLimits: 0,
           currentMemoryRequests: 0,
           currentMemoryLimits: 0,
+          currentCpuUsage: 0,
+          currentMemoryWorkingSet: 0,
           currentPvcCount: 0,
           currentPvcStorageBytes: 0,
+          currentPvcUsedBytes: 0,
           changed: true,
           missingResourceBaseline: false,
         })),
@@ -838,8 +887,11 @@ function kafkaSimulationRow(
         currentCpuLimits: acc.currentCpuLimits + pool.currentCpuLimits,
         currentMemoryRequests: acc.currentMemoryRequests + pool.currentMemoryRequests,
         currentMemoryLimits: acc.currentMemoryLimits + pool.currentMemoryLimits,
+        currentCpuUsage: acc.currentCpuUsage + pool.currentCpuUsage,
+        currentMemoryWorkingSet: acc.currentMemoryWorkingSet + pool.currentMemoryWorkingSet,
         currentPvcCount: acc.currentPvcCount + pool.currentPvcCount,
         currentPvcStorageBytes: acc.currentPvcStorageBytes + pool.currentPvcStorageBytes,
+        currentPvcUsedBytes: acc.currentPvcUsedBytes + pool.currentPvcUsedBytes,
         simulatedCpuRequests: acc.simulatedCpuRequests + pool.simulatedReplicas * podTotals.cpuRequests,
         simulatedCpuLimits: acc.simulatedCpuLimits + pool.simulatedReplicas * podTotals.cpuLimits,
         simulatedMemoryRequests:
@@ -859,8 +911,11 @@ function kafkaSimulationRow(
       currentCpuLimits: 0,
       currentMemoryRequests: 0,
       currentMemoryLimits: 0,
+      currentCpuUsage: 0,
+      currentMemoryWorkingSet: 0,
       currentPvcCount: 0,
       currentPvcStorageBytes: 0,
+      currentPvcUsedBytes: 0,
       simulatedCpuRequests: 0,
       simulatedCpuLimits: 0,
       simulatedMemoryRequests: 0,

@@ -25,17 +25,23 @@ import { prometheusDatasource } from '../../queries/datasources';
 import {
   simulatorClusterAllocatableQuery,
   simulatorKafkaContainersQuery,
+  simulatorKafkaCpuUsageQuery,
   simulatorKafkaLimitsQuery,
+  simulatorKafkaMemoryUsageQuery,
   simulatorKafkaPodsQuery,
   simulatorKafkaPvcCountQuery,
   simulatorKafkaPvcStorageQuery,
+  simulatorKafkaPvcUsedQuery,
   simulatorKafkaRequestsQuery,
   simulatorQuotaQuery,
   simulatorWorkloadContainersQuery,
+  simulatorWorkloadCpuUsageQuery,
   simulatorWorkloadLimitsQuery,
+  simulatorWorkloadMemoryUsageQuery,
   simulatorWorkloadPodsQuery,
   simulatorWorkloadPvcCountQuery,
   simulatorWorkloadPvcStorageQuery,
+  simulatorWorkloadPvcUsedQuery,
   simulatorWorkloadReplicasQuery,
   simulatorWorkloadRequestsQuery,
 } from '../../queries/resourceSimulator';
@@ -278,6 +284,20 @@ function simulatorDataRunner() {
         range: false,
       },
       {
+        refId: 'workloadCpuUsage',
+        expr: simulatorWorkloadCpuUsageQuery(),
+        format: 'time_series',
+        instant: true,
+        range: false,
+      },
+      {
+        refId: 'workloadMemoryUsage',
+        expr: simulatorWorkloadMemoryUsageQuery(),
+        format: 'time_series',
+        instant: true,
+        range: false,
+      },
+      {
         refId: 'workloadPvcCount',
         expr: simulatorWorkloadPvcCountQuery(),
         format: 'time_series',
@@ -287,6 +307,13 @@ function simulatorDataRunner() {
       {
         refId: 'workloadPvcStorage',
         expr: simulatorWorkloadPvcStorageQuery(),
+        format: 'time_series',
+        instant: true,
+        range: false,
+      },
+      {
+        refId: 'workloadPvcUsed',
+        expr: simulatorWorkloadPvcUsedQuery(),
         format: 'time_series',
         instant: true,
         range: false,
@@ -320,6 +347,20 @@ function simulatorDataRunner() {
         range: false,
       },
       {
+        refId: 'kafkaCpuUsage',
+        expr: simulatorKafkaCpuUsageQuery(),
+        format: 'time_series',
+        instant: true,
+        range: false,
+      },
+      {
+        refId: 'kafkaMemoryUsage',
+        expr: simulatorKafkaMemoryUsageQuery(),
+        format: 'time_series',
+        instant: true,
+        range: false,
+      },
+      {
         refId: 'kafkaPvcCount',
         expr: simulatorKafkaPvcCountQuery(),
         format: 'time_series',
@@ -329,6 +370,13 @@ function simulatorDataRunner() {
       {
         refId: 'kafkaPvcStorage',
         expr: simulatorKafkaPvcStorageQuery(),
+        format: 'time_series',
+        instant: true,
+        range: false,
+      },
+      {
+        refId: 'kafkaPvcUsed',
+        expr: simulatorKafkaPvcUsedQuery(),
         format: 'time_series',
         instant: true,
         range: false,
@@ -490,11 +538,14 @@ function KafkaTable({
             <th>Kafka</th>
             <th>Current pods</th>
             <th>Sim pods</th>
+            <th>CPU used</th>
             <th>CPU req</th>
             <th>CPU limit</th>
+            <th>Mem used</th>
             <th>Mem req</th>
             <th>Mem limit</th>
             <th>PVCs</th>
+            <th>PVC used</th>
             <th>PVC storage</th>
             <th>Delta</th>
             <th>Status</th>
@@ -534,11 +585,14 @@ function KafkaTable({
                   </td>
                   <td>{row.currentReplicas}</td>
                   <td>{row.simulatedReplicas}</td>
+                  <td>{formatCpuQuantity(row.currentCpuUsage)}</td>
                   <td>{formatCpuQuantity(row.simulatedCpuRequests)}</td>
                   <td>{formatCpuQuantity(row.simulatedCpuLimits)}</td>
+                  <td>{formatValue(row.currentMemoryWorkingSet, 'bytes')}</td>
                   <td>{formatValue(row.simulatedMemoryRequests, 'bytes')}</td>
                   <td>{formatValue(row.simulatedMemoryLimits, 'bytes')}</td>
                   <td>{row.simulatedPvcCount}</td>
+                  <td>{formatValue(row.currentPvcUsedBytes, 'bytes')}</td>
                   <td>{formatValue(row.simulatedPvcStorageBytes, 'bytes')}</td>
                   <td className={styles.deltaCell}>{formatWorkloadDelta(delta)}</td>
                   <td>
@@ -558,7 +612,7 @@ function KafkaTable({
                 </tr>
                 {expanded && (
                   <tr className={styles.detailRow}>
-                    <td colSpan={12}>
+                    <td colSpan={15}>
                       <KafkaPoolEditor
                         row={row}
                         onChange={(pools) =>
@@ -605,11 +659,14 @@ function KafkaPoolEditor({
             <th>Role</th>
             <th>Current pods</th>
             <th>Sim pods</th>
+            <th>CPU used</th>
             <th>Pod CPU req</th>
             <th>Pod CPU limit</th>
+            <th>Mem used</th>
             <th>Pod mem req</th>
             <th>Pod mem limit</th>
             <th>PVCs</th>
+            <th>PVC used</th>
             <th>PVC size</th>
           </tr>
         </thead>
@@ -633,6 +690,7 @@ function KafkaPoolEditor({
                     onChange={(value) => updatePool(pool, { simulatedReplicas: value })}
                   />
                 </td>
+                <td>{formatCpuQuantity(pool.currentCpuUsage)}</td>
                 <td>
                   <QuantityInput
                     label={`CPU request for ${pool.name} in ${row.name}`}
@@ -657,6 +715,7 @@ function KafkaPoolEditor({
                     }
                   />
                 </td>
+                <td>{formatValue(pool.currentMemoryWorkingSet, 'bytes')}</td>
                 <td>
                   <QuantityInput
                     label={`Memory request for ${pool.name} in ${row.name}`}
@@ -694,6 +753,7 @@ function KafkaPoolEditor({
                     onChange={(value) => updatePool(pool, { pvcCount: value })}
                   />
                 </td>
+                <td>{formatValue(pool.currentPvcUsedBytes, 'bytes')}</td>
                 <td>
                   <QuantityInput
                     label={`PVC size for ${pool.name} in ${row.name}`}
@@ -734,11 +794,14 @@ function WorkloadTable({
             <th>Current replicas</th>
             <th>Sim replicas</th>
             <th>Containers</th>
+            <th>CPU used</th>
             <th>Pod CPU req</th>
             <th>Pod CPU limit</th>
+            <th>Mem used</th>
             <th>Pod mem req</th>
             <th>Pod mem limit</th>
             <th>PVCs</th>
+            <th>PVC used</th>
             <th>PVC size</th>
             <th>Delta</th>
             <th>Status</th>
@@ -821,8 +884,10 @@ function WorkloadTable({
                     />
                   </td>
                   <td>{formatContainerCount(row)}</td>
+                  <td>{formatCpuQuantity(row.currentCpuUsage)}</td>
                   <td>{formatCpuQuantity(podTotals.cpuRequests)}</td>
                   <td>{formatCpuQuantity(podTotals.cpuLimits)}</td>
+                  <td>{formatValue(row.currentMemoryWorkingSet, 'bytes')}</td>
                   <td>{formatGiBQuantity(podTotals.memoryRequests)}</td>
                   <td>{formatGiBQuantity(podTotals.memoryLimits)}</td>
                   <td>
@@ -836,6 +901,7 @@ function WorkloadTable({
                       onChange={updatePvcCount}
                     />
                   </td>
+                  <td>{formatValue(row.currentPvcUsedBytes, 'bytes')}</td>
                   <td>
                     <QuantityInput
                       label={`PVC size for ${row.name}`}
@@ -865,7 +931,7 @@ function WorkloadTable({
                 </tr>
                 {expanded && (
                   <tr className={styles.detailRow}>
-                    <td colSpan={14}>
+                    <td colSpan={17}>
                       <ContainerEditor row={row} containers={row.containers} onChange={updateContainers} />
                     </td>
                   </tr>
@@ -916,8 +982,10 @@ function ContainerEditor({
         <thead>
           <tr>
             <th>Container</th>
+            <th>CPU used</th>
             <th>CPU req</th>
             <th>CPU limit</th>
+            <th>Mem used</th>
             <th>Mem req</th>
             <th>Mem limit</th>
             <th>Actions</th>
@@ -926,6 +994,7 @@ function ContainerEditor({
         <tbody>
           {containers.map((container, index) => {
             const containerName = container.name || `container-${index + 1}`;
+            const liveContainer = row.containerBaselines.find((baseline) => baseline.name === container.name);
 
             return (
               <tr key={`${row.id}-${index}`}>
@@ -937,6 +1006,7 @@ function ContainerEditor({
                     onChange={(event) => updateContainer(index, { name: event.currentTarget.value })}
                   />
                 </td>
+                <td>{formatCpuQuantity(liveContainer?.currentCpuUsage ?? 0)}</td>
                 <td>
                   <QuantityInput
                     label={`CPU request for container ${containerName} in ${row.name}`}
@@ -955,6 +1025,7 @@ function ContainerEditor({
                     onChange={(value) => updateContainer(index, { cpuLimitCores: value })}
                   />
                 </td>
+                <td>{formatValue(liveContainer?.currentMemoryWorkingSet ?? 0, 'bytes')}</td>
                 <td>
                   <QuantityInput
                     label={`Memory request for container ${containerName} in ${row.name}`}
