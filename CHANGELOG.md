@@ -1,3 +1,15 @@
+# [1.13.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.12.0...v1.13.0) (2026-05-13)
+
+
+### Bug Fixes
+
+* use common scale in resource sim ([02d2005](https://github.com/elohmeier/grafana-k8s-app/commit/02d20050f4ba0a18adf15b7ea666085c07914b9c))
+
+
+### Features
+
+* show pvc fill meters for k8s resource sim ([41b374d](https://github.com/elohmeier/grafana-k8s-app/commit/41b374d932f0bb0e54945714543489fa6c3a58ab))
+
 # [1.12.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.11.0...v1.12.0) (2026-05-13)
 
 
