@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.9.3...v1.10.0) (2026-05-13)
+
+
+### Features
+
+* implement current usage display in resource sim ([2144e6f](https://github.com/elohmeier/grafana-k8s-app/commit/2144e6fc48db6160e43d8cb511fd2c135b1e5624))
+
 ## [1.9.3](https://github.com/elohmeier/grafana-k8s-app/compare/v1.9.2...v1.9.3) (2026-05-12)
 
 
