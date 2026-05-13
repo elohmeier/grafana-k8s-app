@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.10.0...v1.11.0) (2026-05-13)
+
+
+### Features
+
+* implement ns quota sim ([652b317](https://github.com/elohmeier/grafana-k8s-app/commit/652b317adf4a4c0dff16afdb7615915e4997ea19))
+
 # [1.10.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.9.3...v1.10.0) (2026-05-13)
 
 
