@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.11.0...v1.12.0) (2026-05-13)
+
+
+### Features
+
+* implement usage meters in sim ([cd64e07](https://github.com/elohmeier/grafana-k8s-app/commit/cd64e07799ff27d0b7c47b693b02bf877b74aba7))
+
 # [1.11.0](https://github.com/elohmeier/grafana-k8s-app/compare/v1.10.0...v1.11.0) (2026-05-13)
 
 
