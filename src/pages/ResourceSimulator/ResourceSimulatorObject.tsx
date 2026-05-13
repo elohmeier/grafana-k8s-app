@@ -84,6 +84,9 @@ type ResourceSimulatorState = SceneObjectState & {
   scenario: string;
 };
 
+type UsageMeterStatus = 'no-request' | 'low' | 'ok' | 'warning' | 'over' | 'high';
+type UsageMeterUnit = 'cores' | 'bytes';
+
 const DEFAULT_SCENARIO_JSON = serializeScenario(DEFAULT_WORKLOAD_SCENARIO);
 const WORKLOAD_TYPE_OPTIONS: Array<ComboboxOption<WorkloadType>> = [
   { label: 'Deployment', value: 'deployment' },
@@ -675,6 +678,44 @@ function QuotaHardInput({ row, onChange }: { row: SimulatorResultRow; onChange: 
   );
 }
 
+function UsageRequestMeter({
+  used,
+  requested,
+  unit,
+}: {
+  used: number;
+  requested: number;
+  unit: UsageMeterUnit;
+}) {
+  const styles = useStyles2(getStyles);
+  const ratio = requested > 0 ? used / requested : undefined;
+  const status = usageMeterStatus(ratio, used, requested);
+  const fillWidth = ratio === undefined ? 0 : Math.min(100, Math.max(2, ratio * 100));
+  const label = usageMeterLabel(status, ratio);
+  const formattedUsed = formatMeterValue(used, unit);
+  const formattedRequested = formatMeterValue(requested, unit);
+
+  return (
+    <div
+      className={styles.usageMeter}
+      aria-label={`${formattedUsed} used of ${formattedRequested} requested, ${label}`}
+      title={`${formattedUsed} used / ${formattedRequested} requested (${label})`}
+    >
+      <div className={styles.usageMeterText}>
+        <strong>{formattedUsed}</strong>
+        <span className={styles.usageMeterMeta}>/ {formattedRequested}</span>
+      </div>
+      <div className={styles.usageMeterTrack}>
+        <div
+          className={`${styles.usageMeterFill} ${usageMeterFillClass(styles, status)}`}
+          style={{ width: `${fillWidth}%` }}
+        />
+      </div>
+      <span className={`${styles.usageMeterBadge} ${usageMeterBadgeClass(styles, status)}`}>{label}</span>
+    </div>
+  );
+}
+
 function KafkaTable({
   model,
   rows,
@@ -695,10 +736,10 @@ function KafkaTable({
             <th>Kafka</th>
             <th>Current pods</th>
             <th>Sim pods</th>
-            <th>CPU used</th>
+            <th>CPU used / req</th>
             <th>CPU req</th>
             <th>CPU limit</th>
-            <th>Mem used</th>
+            <th>Mem used / req</th>
             <th>Mem req</th>
             <th>Mem limit</th>
             <th>PVCs</th>
@@ -742,10 +783,18 @@ function KafkaTable({
                   </td>
                   <td>{row.currentReplicas}</td>
                   <td>{row.simulatedReplicas}</td>
-                  <td>{formatCpuQuantity(row.currentCpuUsage)}</td>
+                  <td>
+                    <UsageRequestMeter used={row.currentCpuUsage} requested={row.simulatedCpuRequests} unit="cores" />
+                  </td>
                   <td>{formatCpuQuantity(row.simulatedCpuRequests)}</td>
                   <td>{formatCpuQuantity(row.simulatedCpuLimits)}</td>
-                  <td>{formatValue(row.currentMemoryWorkingSet, 'bytes')}</td>
+                  <td>
+                    <UsageRequestMeter
+                      used={row.currentMemoryWorkingSet}
+                      requested={row.simulatedMemoryRequests}
+                      unit="bytes"
+                    />
+                  </td>
                   <td>{formatValue(row.simulatedMemoryRequests, 'bytes')}</td>
                   <td>{formatValue(row.simulatedMemoryLimits, 'bytes')}</td>
                   <td>{row.simulatedPvcCount}</td>
@@ -816,10 +865,10 @@ function KafkaPoolEditor({
             <th>Role</th>
             <th>Current pods</th>
             <th>Sim pods</th>
-            <th>CPU used</th>
+            <th>CPU used / req</th>
             <th>Pod CPU req</th>
             <th>Pod CPU limit</th>
-            <th>Mem used</th>
+            <th>Mem used / req</th>
             <th>Pod mem req</th>
             <th>Pod mem limit</th>
             <th>PVCs</th>
@@ -830,6 +879,8 @@ function KafkaPoolEditor({
         <tbody>
           {row.pools.map((pool) => {
             const podTotals = containerResourceTotals(pool.containers);
+            const simulatedCpuRequests = pool.simulatedReplicas * podTotals.cpuRequests;
+            const simulatedMemoryRequests = pool.simulatedReplicas * podTotals.memoryRequests * BYTES_PER_GIB;
 
             return (
               <tr key={pool.id}>
@@ -847,7 +898,9 @@ function KafkaPoolEditor({
                     onChange={(value) => updatePool(pool, { simulatedReplicas: value })}
                   />
                 </td>
-                <td>{formatCpuQuantity(pool.currentCpuUsage)}</td>
+                <td>
+                  <UsageRequestMeter used={pool.currentCpuUsage} requested={simulatedCpuRequests} unit="cores" />
+                </td>
                 <td>
                   <QuantityInput
                     label={`CPU request for ${pool.name} in ${row.name}`}
@@ -872,7 +925,13 @@ function KafkaPoolEditor({
                     }
                   />
                 </td>
-                <td>{formatValue(pool.currentMemoryWorkingSet, 'bytes')}</td>
+                <td>
+                  <UsageRequestMeter
+                    used={pool.currentMemoryWorkingSet}
+                    requested={simulatedMemoryRequests}
+                    unit="bytes"
+                  />
+                </td>
                 <td>
                   <QuantityInput
                     label={`Memory request for ${pool.name} in ${row.name}`}
@@ -951,10 +1010,10 @@ function WorkloadTable({
             <th>Current replicas</th>
             <th>Sim replicas</th>
             <th>Containers</th>
-            <th>CPU used</th>
+            <th>CPU used / req</th>
             <th>Pod CPU req</th>
             <th>Pod CPU limit</th>
-            <th>Mem used</th>
+            <th>Mem used / req</th>
             <th>Pod mem req</th>
             <th>Pod mem limit</th>
             <th>PVCs</th>
@@ -970,6 +1029,8 @@ function WorkloadTable({
             const delta = deltas[row.id];
             const expanded = Boolean(expandedRows[row.id]);
             const podTotals = containerResourceTotals(row.containers);
+            const simulatedCpuRequests = row.simulatedReplicas * podTotals.cpuRequests;
+            const simulatedMemoryRequests = row.simulatedReplicas * podTotals.memoryRequests * BYTES_PER_GIB;
             const onValueChange = (patch: Partial<WorkloadEditableValues>) =>
               row.isTemporary ? model.updateTempRow(row, patch) : model.updateExistingRow(row, patch);
             const updateReplicas = (simulatedReplicas: number) =>
@@ -1041,10 +1102,18 @@ function WorkloadTable({
                     />
                   </td>
                   <td>{formatContainerCount(row)}</td>
-                  <td>{formatCpuQuantity(row.currentCpuUsage)}</td>
+                  <td>
+                    <UsageRequestMeter used={row.currentCpuUsage} requested={simulatedCpuRequests} unit="cores" />
+                  </td>
                   <td>{formatCpuQuantity(podTotals.cpuRequests)}</td>
                   <td>{formatCpuQuantity(podTotals.cpuLimits)}</td>
-                  <td>{formatValue(row.currentMemoryWorkingSet, 'bytes')}</td>
+                  <td>
+                    <UsageRequestMeter
+                      used={row.currentMemoryWorkingSet}
+                      requested={simulatedMemoryRequests}
+                      unit="bytes"
+                    />
+                  </td>
                   <td>{formatGiBQuantity(podTotals.memoryRequests)}</td>
                   <td>{formatGiBQuantity(podTotals.memoryLimits)}</td>
                   <td>
@@ -1139,10 +1208,10 @@ function ContainerEditor({
         <thead>
           <tr>
             <th>Container</th>
-            <th>CPU used</th>
+            <th>CPU used / req</th>
             <th>CPU req</th>
             <th>CPU limit</th>
-            <th>Mem used</th>
+            <th>Mem used / req</th>
             <th>Mem req</th>
             <th>Mem limit</th>
             <th>Actions</th>
@@ -1152,6 +1221,9 @@ function ContainerEditor({
           {containers.map((container, index) => {
             const containerName = container.name || `container-${index + 1}`;
             const liveContainer = row.containerBaselines.find((baseline) => baseline.name === container.name);
+            const simulatedCpuRequest = row.simulatedReplicas * Math.max(0, container.cpuRequestCores);
+            const simulatedMemoryRequest =
+              row.simulatedReplicas * Math.max(0, container.memoryRequestGiB) * BYTES_PER_GIB;
 
             return (
               <tr key={`${row.id}-${index}`}>
@@ -1163,7 +1235,13 @@ function ContainerEditor({
                     onChange={(event) => updateContainer(index, { name: event.currentTarget.value })}
                   />
                 </td>
-                <td>{formatCpuQuantity(liveContainer?.currentCpuUsage ?? 0)}</td>
+                <td>
+                  <UsageRequestMeter
+                    used={liveContainer?.currentCpuUsage ?? 0}
+                    requested={simulatedCpuRequest}
+                    unit="cores"
+                  />
+                </td>
                 <td>
                   <QuantityInput
                     label={`CPU request for container ${containerName} in ${row.name}`}
@@ -1182,7 +1260,13 @@ function ContainerEditor({
                     onChange={(value) => updateContainer(index, { cpuLimitCores: value })}
                   />
                 </td>
-                <td>{formatValue(liveContainer?.currentMemoryWorkingSet ?? 0, 'bytes')}</td>
+                <td>
+                  <UsageRequestMeter
+                    used={liveContainer?.currentMemoryWorkingSet ?? 0}
+                    requested={simulatedMemoryRequest}
+                    unit="bytes"
+                  />
+                </td>
                 <td>
                   <QuantityInput
                     label={`Memory request for container ${containerName} in ${row.name}`}
@@ -1607,6 +1691,112 @@ function parseByteQuantityToBytes(value: string) {
   return gib === undefined ? undefined : gib * BYTES_PER_GIB;
 }
 
+function usageMeterStatus(ratio: number | undefined, used: number, requested: number): UsageMeterStatus {
+  if (requested <= 0) {
+    return used > 0 ? 'no-request' : 'no-request';
+  }
+
+  if (ratio === undefined) {
+    return 'no-request';
+  }
+
+  if (ratio >= 1.5) {
+    return 'high';
+  }
+
+  if (ratio >= 1) {
+    return 'over';
+  }
+
+  if (ratio >= 0.8) {
+    return 'warning';
+  }
+
+  if (ratio < 0.2) {
+    return 'low';
+  }
+
+  return 'ok';
+}
+
+function usageMeterLabel(status: UsageMeterStatus, ratio: number | undefined) {
+  if (status === 'no-request') {
+    return 'No req';
+  }
+
+  const formattedRatio = ratio === undefined ? '-' : formatPercentage(ratio);
+
+  if (status === 'high') {
+    return `${formattedRatio} high`;
+  }
+
+  if (status === 'over') {
+    return `${formattedRatio} over`;
+  }
+
+  if (status === 'warning') {
+    return `${formattedRatio} near`;
+  }
+
+  if (status === 'low') {
+    return `${formattedRatio} low`;
+  }
+
+  return `${formattedRatio} req`;
+}
+
+function usageMeterFillClass(styles: ReturnType<typeof getStyles>, status: UsageMeterStatus) {
+  if (status === 'high') {
+    return styles.usageMeterFillHigh;
+  }
+
+  if (status === 'over') {
+    return styles.usageMeterFillOver;
+  }
+
+  if (status === 'warning') {
+    return styles.usageMeterFillWarning;
+  }
+
+  if (status === 'low') {
+    return styles.usageMeterFillLow;
+  }
+
+  if (status === 'no-request') {
+    return styles.usageMeterFillNoRequest;
+  }
+
+  return styles.usageMeterFillOk;
+}
+
+function usageMeterBadgeClass(styles: ReturnType<typeof getStyles>, status: UsageMeterStatus) {
+  if (status === 'high') {
+    return styles.usageMeterBadgeHigh;
+  }
+
+  if (status === 'over') {
+    return styles.usageMeterBadgeOver;
+  }
+
+  if (status === 'warning') {
+    return styles.usageMeterBadgeWarning;
+  }
+
+  if (status === 'low') {
+    return styles.usageMeterBadgeLow;
+  }
+
+  if (status === 'no-request') {
+    return styles.usageMeterBadgeNoRequest;
+  }
+
+  return styles.usageMeterBadgeOk;
+}
+
+function formatMeterValue(value: number, unit: UsageMeterUnit) {
+  return unit === 'cores' ? formatCpuQuantity(value) : formatValue(value, 'bytes');
+}
+
 function formatWorkloadType(type: WorkloadType) {
   return WORKLOAD_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type;
 }
@@ -1890,7 +2080,7 @@ function getStyles() {
     }),
     table: css({
       borderCollapse: 'collapse',
-      minWidth: 1340,
+      minWidth: 1640,
       width: '100%',
 
       'th, td': {
@@ -1952,7 +2142,7 @@ function getStyles() {
     nestedTable: css({
       borderCollapse: 'collapse',
       marginTop: 8,
-      minWidth: 760,
+      minWidth: 1080,
       width: '100%',
 
       'th, td': {
@@ -1976,6 +2166,85 @@ function getStyles() {
       display: 'block',
       fontSize: 12,
       opacity: 0.65,
+    }),
+    usageMeter: css({
+      minWidth: 142,
+      width: 150,
+    }),
+    usageMeterText: css({
+      alignItems: 'baseline',
+      display: 'flex',
+      gap: 4,
+      whiteSpace: 'nowrap',
+    }),
+    usageMeterMeta: css({
+      fontSize: 11,
+      opacity: 0.68,
+    }),
+    usageMeterTrack: css({
+      background: 'rgba(128, 128, 128, 0.22)',
+      borderRadius: 3,
+      height: 6,
+      marginTop: 4,
+      overflow: 'hidden',
+      width: '100%',
+    }),
+    usageMeterFill: css({
+      borderRadius: 3,
+      height: '100%',
+      minWidth: 0,
+    }),
+    usageMeterFillNoRequest: css({
+      background: 'rgba(128, 128, 128, 0.65)',
+    }),
+    usageMeterFillLow: css({
+      background: 'rgba(2, 119, 189, 0.9)',
+    }),
+    usageMeterFillOk: css({
+      background: 'rgba(46, 125, 50, 0.95)',
+    }),
+    usageMeterFillWarning: css({
+      background: 'linear-gradient(90deg, rgba(46, 125, 50, 0.95), rgba(245, 124, 0, 0.95))',
+    }),
+    usageMeterFillOver: css({
+      background: 'rgba(230, 81, 0, 0.95)',
+    }),
+    usageMeterFillHigh: css({
+      background: 'rgba(211, 47, 47, 0.95)',
+    }),
+    usageMeterBadge: css({
+      border: '1px solid transparent',
+      borderRadius: 3,
+      display: 'inline-block',
+      fontSize: 11,
+      lineHeight: '16px',
+      marginTop: 4,
+      padding: '0 5px',
+      whiteSpace: 'nowrap',
+    }),
+    usageMeterBadgeNoRequest: css({
+      background: 'rgba(128, 128, 128, 0.14)',
+      borderColor: 'rgba(128, 128, 128, 0.42)',
+    }),
+    usageMeterBadgeLow: css({
+      background: 'rgba(2, 119, 189, 0.12)',
+      borderColor: 'rgba(2, 119, 189, 0.45)',
+    }),
+    usageMeterBadgeOk: css({
+      background: 'rgba(46, 125, 50, 0.12)',
+      borderColor: 'rgba(46, 125, 50, 0.42)',
+    }),
+    usageMeterBadgeWarning: css({
+      background: 'rgba(245, 124, 0, 0.13)',
+      borderColor: 'rgba(245, 124, 0, 0.5)',
+    }),
+    usageMeterBadgeOver: css({
+      background: 'rgba(230, 81, 0, 0.14)',
+      borderColor: 'rgba(230, 81, 0, 0.55)',
+    }),
+    usageMeterBadgeHigh: css({
+      background: 'rgba(211, 47, 47, 0.14)',
+      borderColor: 'rgba(211, 47, 47, 0.58)',
     }),
     srOnly: css({
       border: 0,
