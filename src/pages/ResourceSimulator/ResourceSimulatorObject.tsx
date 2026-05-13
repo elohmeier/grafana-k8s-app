@@ -86,6 +86,7 @@ type ResourceSimulatorState = SceneObjectState & {
 
 type UsageMeterStatus = 'no-request' | 'low' | 'ok' | 'warning' | 'over' | 'high';
 type UsageMeterUnit = 'cores' | 'bytes';
+type PvcMeterStatus = 'no-pvc' | 'ok' | 'warning' | 'risk';
 
 const DEFAULT_SCENARIO_JSON = serializeScenario(DEFAULT_WORKLOAD_SCENARIO);
 const WORKLOAD_TYPE_OPTIONS: Array<ComboboxOption<WorkloadType>> = [
@@ -715,6 +716,35 @@ function UsageRequestMeter({
   );
 }
 
+function PvcUsageMeter({ used, size }: { used: number; size: number }) {
+  const styles = useStyles2(getStyles);
+  const ratio = size > 0 ? used / size : undefined;
+  const status = pvcMeterStatus(ratio, used, size);
+  const fillWidth = ratio === undefined ? 0 : Math.min(100, Math.max(2, ratio * 100));
+  const label = pvcMeterLabel(status, ratio);
+  const { used: formattedUsed, requested: formattedSize } = formatMeterPair(used, size, 'bytes');
+
+  return (
+    <div
+      className={styles.usageMeter}
+      aria-label={`${formattedUsed} used of ${formattedSize} PVC size, ${label}`}
+      title={`${formattedUsed} used / ${formattedSize} PVC size (${label})`}
+    >
+      <div className={styles.usageMeterText}>
+        <strong>{formattedUsed}</strong>
+        <span className={styles.usageMeterMeta}>/ {formattedSize}</span>
+      </div>
+      <div className={styles.usageMeterTrack}>
+        <div
+          className={`${styles.usageMeterFill} ${pvcMeterFillClass(styles, status)}`}
+          style={{ width: `${fillWidth}%` }}
+        />
+      </div>
+      <span className={`${styles.usageMeterBadge} ${pvcMeterBadgeClass(styles, status)}`}>{label}</span>
+    </div>
+  );
+}
+
 function KafkaTable({
   model,
   rows,
@@ -742,7 +772,7 @@ function KafkaTable({
             <th>Mem req</th>
             <th>Mem limit</th>
             <th>PVCs</th>
-            <th>PVC used</th>
+            <th>PVC used / size</th>
             <th>PVC storage</th>
             <th>Delta</th>
             <th>Status</th>
@@ -797,7 +827,9 @@ function KafkaTable({
                   <td>{formatValue(row.simulatedMemoryRequests, 'bytes')}</td>
                   <td>{formatValue(row.simulatedMemoryLimits, 'bytes')}</td>
                   <td>{row.simulatedPvcCount}</td>
-                  <td>{formatValue(row.currentPvcUsedBytes, 'bytes')}</td>
+                  <td>
+                    <PvcUsageMeter used={row.currentPvcUsedBytes} size={row.simulatedPvcStorageBytes} />
+                  </td>
                   <td>{formatValue(row.simulatedPvcStorageBytes, 'bytes')}</td>
                   <td className={styles.deltaCell}>{formatWorkloadDelta(delta)}</td>
                   <td>
@@ -871,7 +903,7 @@ function KafkaPoolEditor({
             <th>Pod mem req</th>
             <th>Pod mem limit</th>
             <th>PVCs</th>
-            <th>PVC used</th>
+            <th>PVC used / size</th>
             <th>PVC size</th>
           </tr>
         </thead>
@@ -968,7 +1000,12 @@ function KafkaPoolEditor({
                     onChange={(value) => updatePool(pool, { pvcCount: value })}
                   />
                 </td>
-                <td>{formatValue(pool.currentPvcUsedBytes, 'bytes')}</td>
+                <td>
+                  <PvcUsageMeter
+                    used={pool.currentPvcUsedBytes}
+                    size={Math.max(pool.currentPvcStorageBytes, pool.pvcCount * pool.pvcStorageGiB * BYTES_PER_GIB)}
+                  />
+                </td>
                 <td>
                   <QuantityInput
                     label={`PVC size for ${pool.name} in ${row.name}`}
@@ -1016,7 +1053,7 @@ function WorkloadTable({
             <th>Pod mem req</th>
             <th>Pod mem limit</th>
             <th>PVCs</th>
-            <th>PVC used</th>
+            <th>PVC used / size</th>
             <th>PVC size</th>
             <th>Delta</th>
             <th>Status</th>
@@ -1126,7 +1163,12 @@ function WorkloadTable({
                       onChange={updatePvcCount}
                     />
                   </td>
-                  <td>{formatValue(row.currentPvcUsedBytes, 'bytes')}</td>
+                  <td>
+                    <PvcUsageMeter
+                      used={row.currentPvcUsedBytes}
+                      size={Math.max(row.currentPvcStorageBytes, row.pvcCount * row.pvcStorageGiB * BYTES_PER_GIB)}
+                    />
+                  </td>
                   <td>
                     <QuantityInput
                       label={`PVC size for ${row.name}`}
@@ -1786,6 +1828,76 @@ function usageMeterBadgeClass(styles: ReturnType<typeof getStyles>, status: Usag
   }
 
   if (status === 'no-request') {
+    return styles.usageMeterBadgeNoRequest;
+  }
+
+  return styles.usageMeterBadgeOk;
+}
+
+function pvcMeterStatus(ratio: number | undefined, used: number, size: number): PvcMeterStatus {
+  if (size <= 0 || (used <= 0 && ratio === undefined)) {
+    return 'no-pvc';
+  }
+
+  if (ratio === undefined) {
+    return 'no-pvc';
+  }
+
+  if (ratio >= 0.9) {
+    return 'risk';
+  }
+
+  if (ratio >= 0.8) {
+    return 'warning';
+  }
+
+  return 'ok';
+}
+
+function pvcMeterLabel(status: PvcMeterStatus, ratio: number | undefined) {
+  if (status === 'no-pvc') {
+    return 'No PVC';
+  }
+
+  const formattedRatio = ratio === undefined ? '-' : formatPercentage(ratio);
+
+  if (status === 'risk') {
+    return `${formattedRatio} full risk`;
+  }
+
+  if (status === 'warning') {
+    return `${formattedRatio} near full`;
+  }
+
+  return `${formattedRatio} used`;
+}
+
+function pvcMeterFillClass(styles: ReturnType<typeof getStyles>, status: PvcMeterStatus) {
+  if (status === 'risk') {
+    return styles.usageMeterFillHigh;
+  }
+
+  if (status === 'warning') {
+    return styles.usageMeterFillWarning;
+  }
+
+  if (status === 'no-pvc') {
+    return styles.usageMeterFillNoRequest;
+  }
+
+  return styles.usageMeterFillOk;
+}
+
+function pvcMeterBadgeClass(styles: ReturnType<typeof getStyles>, status: PvcMeterStatus) {
+  if (status === 'risk') {
+    return styles.usageMeterBadgeHigh;
+  }
+
+  if (status === 'warning') {
+    return styles.usageMeterBadgeWarning;
+  }
+
+  if (status === 'no-pvc') {
     return styles.usageMeterBadgeNoRequest;
   }
 
