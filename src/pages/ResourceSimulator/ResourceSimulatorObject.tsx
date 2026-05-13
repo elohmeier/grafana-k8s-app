@@ -692,8 +692,7 @@ function UsageRequestMeter({
   const status = usageMeterStatus(ratio, used, requested);
   const fillWidth = ratio === undefined ? 0 : Math.min(100, Math.max(2, ratio * 100));
   const label = usageMeterLabel(status, ratio);
-  const formattedUsed = formatMeterValue(used, unit);
-  const formattedRequested = formatMeterValue(requested, unit);
+  const { used: formattedUsed, requested: formattedRequested } = formatMeterPair(used, requested, unit);
 
   return (
     <div
@@ -1793,8 +1792,58 @@ function usageMeterBadgeClass(styles: ReturnType<typeof getStyles>, status: Usag
   return styles.usageMeterBadgeOk;
 }
 
-function formatMeterValue(value: number, unit: UsageMeterUnit) {
-  return unit === 'cores' ? formatCpuQuantity(value) : formatValue(value, 'bytes');
+function formatMeterPair(used: number, requested: number, unit: UsageMeterUnit) {
+  if (unit === 'cores') {
+    const useMillicores = requested < 1 || (used < 1 && requested < 1);
+
+    return {
+      used: useMillicores ? formatMillicores(used) : formatCores(used),
+      requested: useMillicores ? formatMillicores(requested) : formatCores(requested),
+    };
+  }
+
+  const useMiB = requested < BYTES_PER_GIB;
+
+  return {
+    used: useMiB ? formatMiB(used) : formatGiB(used),
+    requested: useMiB ? formatMiB(requested) : formatGiB(requested),
+  };
+}
+
+function formatMillicores(cores: number) {
+  if (!Number.isFinite(cores) || cores <= 0) {
+    return '0m';
+  }
+
+  return `${formatQuantityNumber(cores * 1000)}m`;
+}
+
+function formatCores(cores: number) {
+  if (!Number.isFinite(cores) || cores <= 0) {
+    return '0 cores';
+  }
+
+  return `${formatQuantityNumber(cores)} cores`;
+}
+
+function formatMiB(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0Mi';
+  }
+
+  return `${formatQuantityNumber(bytes / 1024 ** 2)}Mi`;
+}
+
+function formatGiB(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0Gi';
+  }
+
+  return `${formatQuantityNumber(bytes / BYTES_PER_GIB)}Gi`;
+}
+
+function formatQuantityNumber(value: number) {
+  return Number(value.toFixed(3)).toLocaleString(undefined, { maximumFractionDigits: 3 });
 }
 
 function formatWorkloadType(type: WorkloadType) {
