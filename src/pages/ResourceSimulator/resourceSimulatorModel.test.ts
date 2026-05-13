@@ -21,10 +21,11 @@ const statefulSetLabels = { workload: 'db', workload_type: 'statefulset' };
 
 function scenario(
   overrides: WorkloadScenarioState['overrides'] = {},
-  tempRows: WorkloadScenarioState['tempRows'] = []
+  tempRows: WorkloadScenarioState['tempRows'] = [],
+  quotaOverrides: WorkloadScenarioState['quotaOverrides'] = {}
 ) {
   return JSON.parse(
-    serializeScenario({ overrides, tempRows, kafkaOverrides: {}, tempKafkaRows: [] })
+    serializeScenario({ overrides, tempRows, kafkaOverrides: {}, tempKafkaRows: [], quotaOverrides })
   ) as WorkloadScenarioState;
 }
 
@@ -417,6 +418,71 @@ describe('resource simulator model', () => {
     );
   });
 
+  it('uses simulated namespace quota hard limits when provided', () => {
+    const baseline = buildBaseline([
+      sample('quota', { resource: 'requests.cpu', type: 'used' }, 4),
+      sample('quota', { resource: 'requests.cpu', type: 'hard' }, 10),
+      sample('quota', { resource: 'count/pods', type: 'used' }, 3),
+      sample('quota', { resource: 'count/pods', type: 'hard' }, 8),
+    ]);
+    const results = calculateSimulatorResults(
+      baseline,
+      scenario(
+        {},
+        [
+          {
+            ...workloadValues({
+              simulatedReplicas: 2,
+              containers: [container('app', { cpuRequestCores: 1 })],
+            }),
+            id: 'temp-1',
+            name: 'load-test',
+            type: 'deployment',
+          },
+        ],
+        {
+          'requests.cpu': 5,
+          pods: 4,
+        }
+      )
+    );
+
+    expect(results.rows.find((row) => row.key === 'requests.cpu')).toMatchObject({
+      baseline: 4,
+      delta: 2,
+      projected: 6,
+      liveHard: 10,
+      hard: 5,
+      hardEdited: true,
+      status: 'exceeded',
+    });
+    expect(results.rows.find((row) => row.key === 'pods')).toMatchObject({
+      liveHard: 8,
+      hard: 4,
+      hardEdited: true,
+      status: 'exceeded',
+    });
+  });
+
+  it('normalizes simulated quota hard limits from URL state', () => {
+    const parsed = parseScenario(
+      JSON.stringify({
+        quotaOverrides: {
+          'requests.cpu': 8,
+          pods: 30,
+          unknown: 4,
+          'requests.memory': -1,
+          'limits.cpu': 'large',
+        },
+      })
+    );
+
+    expect(parsed.quotaOverrides).toEqual({
+      'requests.cpu': 8,
+      pods: 30,
+    });
+  });
+
   it('keeps missing capacity hard values unknown', () => {
     const results = calculateSimulatorResults(buildBaseline([]), scenario());
 
@@ -428,7 +494,13 @@ describe('resource simulator model', () => {
   });
 
   it('normalizes malformed URL scenario state', () => {
-    expect(parseScenario('not json')).toEqual({ overrides: {}, tempRows: [], kafkaOverrides: {}, tempKafkaRows: [] });
+    expect(parseScenario('not json')).toEqual({
+      overrides: {},
+      tempRows: [],
+      kafkaOverrides: {},
+      tempKafkaRows: [],
+      quotaOverrides: {},
+    });
 
     const parsed = parseScenario(
       JSON.stringify({

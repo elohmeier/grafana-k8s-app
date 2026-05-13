@@ -29,6 +29,7 @@ export type WorkloadScenarioState = {
   tempRows: WorkloadScenarioRow[];
   kafkaOverrides: Record<string, KafkaEditableValues>;
   tempKafkaRows: KafkaScenarioRow[];
+  quotaOverrides: Record<string, number>;
 };
 
 export const DEFAULT_WORKLOAD_SCENARIO: WorkloadScenarioState = {
@@ -36,6 +37,7 @@ export const DEFAULT_WORKLOAD_SCENARIO: WorkloadScenarioState = {
   tempRows: [],
   kafkaOverrides: {},
   tempKafkaRows: [],
+  quotaOverrides: {},
 };
 
 export const DEFAULT_WORKLOAD_CONTAINER_VALUES: WorkloadContainerValues = {
@@ -216,6 +218,8 @@ export type SimulatorResultRow = {
   delta: number;
   projected: number;
   hard?: number;
+  liveHard?: number;
+  hardEdited: boolean;
   remaining?: number;
   ratio?: number;
   status: SimulatorRowStatus;
@@ -246,6 +250,21 @@ export type SimulatorResults = {
   warnings: string[];
   deltas: Omit<WorkloadDelta, 'rowId'>;
 };
+
+export const SIMULATOR_QUOTA_RESOURCE_KEYS = [
+  'requests.cpu',
+  'requests.memory',
+  'limits.cpu',
+  'limits.memory',
+  'requests.storage',
+  'pods',
+  'count/deployments.apps',
+  'count/statefulsets.apps',
+  'count/persistentvolumeclaims',
+  'count/configmaps',
+  'count/secrets',
+  'count/services',
+] as const;
 
 function finite(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
@@ -568,6 +587,7 @@ export function normalizeScenario(scenario: Partial<WorkloadScenarioState> = {})
   const tempRows: WorkloadScenarioRow[] = [];
   const kafkaOverrides: Record<string, KafkaEditableValues> = {};
   const tempKafkaRows: KafkaScenarioRow[] = [];
+  const quotaOverrides: Record<string, number> = {};
 
   for (const [id, values] of Object.entries(scenario.overrides ?? {})) {
     const normalized = normalizeEditableValues(values);
@@ -615,7 +635,19 @@ export function normalizeScenario(scenario: Partial<WorkloadScenarioState> = {})
     });
   }
 
-  return { overrides, tempRows, kafkaOverrides, tempKafkaRows };
+  for (const [resource, value] of Object.entries(scenario.quotaOverrides ?? {})) {
+    if (!isSimulatorQuotaResource(resource) || !finite(value) || value < 0) {
+      continue;
+    }
+
+    quotaOverrides[resource] = value;
+  }
+
+  return { overrides, tempRows, kafkaOverrides, tempKafkaRows, quotaOverrides };
+}
+
+function isSimulatorQuotaResource(value: string): value is (typeof SIMULATOR_QUOTA_RESOURCE_KEYS)[number] {
+  return (SIMULATOR_QUOTA_RESOURCE_KEYS as readonly string[]).includes(value);
 }
 
 function normalizeEditableValues(values?: Partial<WorkloadEditableValues>) {
@@ -1107,6 +1139,22 @@ function hardValue(baseline: SimulatorBaseline, ...resources: string[]) {
   return undefined;
 }
 
+function quotaHardValue(
+  baseline: SimulatorBaseline,
+  scenario: WorkloadScenarioState,
+  key: string,
+  ...resources: string[]
+) {
+  const liveHard = hardValue(baseline, ...resources);
+  const override = scenario.quotaOverrides[key];
+
+  return {
+    hard: finite(override) ? override : liveHard,
+    liveHard,
+    hardEdited: finite(override),
+  };
+}
+
 function statusFor(projected: number, hard: number | undefined, source: SimulatorRowSource): SimulatorRowStatus {
   if (!finite(hard)) {
     return source === 'quota' ? 'unlimited' : 'unknown';
@@ -1130,7 +1178,9 @@ function resultRow(
   source: SimulatorRowSource,
   baseline: number,
   delta: number,
-  hard?: number
+  hard?: number,
+  liveHard = hard,
+  hardEdited = false
 ): SimulatorResultRow {
   const projected = Math.max(0, baseline + delta);
   const remaining = finite(hard) ? hard - projected : undefined;
@@ -1145,10 +1195,27 @@ function resultRow(
     delta,
     projected,
     hard,
+    liveHard,
+    hardEdited,
     remaining,
     ratio,
     status: statusFor(projected, hard, source),
   };
+}
+
+function quotaResultRow(
+  baseline: SimulatorBaseline,
+  scenario: WorkloadScenarioState,
+  key: string,
+  label: string,
+  unit: SimulatorRowUnit,
+  used: number,
+  delta: number,
+  ...hardResources: string[]
+) {
+  const { hard, liveHard, hardEdited } = quotaHardValue(baseline, scenario, key, ...hardResources);
+
+  return resultRow(key, label, unit, 'quota', used, delta, hard, liveHard, hardEdited);
 }
 
 export function calculateSimulatorResults(
@@ -1192,113 +1259,127 @@ export function calculateSimulatorResults(
   );
 
   const rows: SimulatorResultRow[] = [
-    resultRow(
+    quotaResultRow(
+      baseline,
+      scenario,
       'requests.cpu',
       'CPU requests quota',
       'cores',
-      'quota',
       quotaBaseline(baseline, 'requests.cpu', fallback.cpuRequests),
       deltas.cpuRequests,
-      hardValue(baseline, 'requests.cpu')
+      'requests.cpu'
     ),
-    resultRow(
+    quotaResultRow(
+      baseline,
+      scenario,
       'requests.memory',
       'Memory requests quota',
       'bytes',
-      'quota',
       quotaBaseline(baseline, 'requests.memory', fallback.memoryRequests),
       deltas.memoryRequests,
-      hardValue(baseline, 'requests.memory')
+      'requests.memory'
     ),
-    resultRow(
+    quotaResultRow(
+      baseline,
+      scenario,
       'limits.cpu',
       'CPU limits quota',
       'cores',
-      'quota',
       quotaBaseline(baseline, 'limits.cpu', fallback.cpuLimits),
       deltas.cpuLimits,
-      hardValue(baseline, 'limits.cpu')
+      'limits.cpu'
     ),
-    resultRow(
+    quotaResultRow(
+      baseline,
+      scenario,
       'limits.memory',
       'Memory limits quota',
       'bytes',
-      'quota',
       quotaBaseline(baseline, 'limits.memory', fallback.memoryLimits),
       deltas.memoryLimits,
-      hardValue(baseline, 'limits.memory')
+      'limits.memory'
     ),
-    resultRow(
+    quotaResultRow(
+      baseline,
+      scenario,
       'requests.storage',
       'Storage requests quota',
       'bytes',
-      'quota',
       quotaBaseline(baseline, 'requests.storage', fallback.pvcStorage),
       deltas.pvcStorage,
-      hardValue(baseline, 'requests.storage')
+      'requests.storage'
     ),
-    resultRow(
+    quotaResultRow(
+      baseline,
+      scenario,
       'pods',
       'Pods quota',
       'count',
-      'quota',
       quotaBaseline(baseline, 'pods', fallback.pods, 'count/pods'),
       deltas.pods,
-      hardValue(baseline, 'pods', 'count/pods')
+      'pods',
+      'count/pods'
     ),
-    resultRow(
+    quotaResultRow(
+      baseline,
+      scenario,
       'count/deployments.apps',
       'Deployment objects',
       'count',
-      'quota',
       quotaBaseline(baseline, 'count/deployments.apps', fallback.deploymentObjects),
       deltas.deploymentObjects,
-      hardValue(baseline, 'count/deployments.apps')
+      'count/deployments.apps'
     ),
-    resultRow(
+    quotaResultRow(
+      baseline,
+      scenario,
       'count/statefulsets.apps',
       'StatefulSet objects',
       'count',
-      'quota',
       quotaBaseline(baseline, 'count/statefulsets.apps', fallback.statefulSetObjects),
       deltas.statefulSetObjects,
-      hardValue(baseline, 'count/statefulsets.apps')
+      'count/statefulsets.apps'
     ),
-    resultRow(
+    quotaResultRow(
+      baseline,
+      scenario,
       'count/persistentvolumeclaims',
       'PersistentVolumeClaims',
       'count',
-      'quota',
       quotaBaseline(baseline, 'count/persistentvolumeclaims', fallback.pvcCount, 'persistentvolumeclaims'),
       deltas.pvcCount,
-      hardValue(baseline, 'count/persistentvolumeclaims', 'persistentvolumeclaims')
+      'count/persistentvolumeclaims',
+      'persistentvolumeclaims'
     ),
-    resultRow(
+    quotaResultRow(
+      baseline,
+      scenario,
       'count/configmaps',
       'ConfigMap objects',
       'count',
-      'quota',
       quotaBaseline(baseline, 'count/configmaps', 0),
       deltas.configMapObjects,
-      hardValue(baseline, 'count/configmaps')
+      'count/configmaps'
     ),
-    resultRow(
+    quotaResultRow(
+      baseline,
+      scenario,
       'count/secrets',
       'Secret objects',
       'count',
-      'quota',
       quotaBaseline(baseline, 'count/secrets', 0),
       deltas.secretObjects,
-      hardValue(baseline, 'count/secrets')
+      'count/secrets'
     ),
-    resultRow(
+    quotaResultRow(
+      baseline,
+      scenario,
       'count/services',
       'Service objects',
       'count',
-      'quota',
       quotaBaseline(baseline, 'count/services', 0),
       deltas.serviceObjects,
-      hardValue(baseline, 'count/services')
+      'count/services'
     ),
     resultRow(
       'cluster.requests.cpu',

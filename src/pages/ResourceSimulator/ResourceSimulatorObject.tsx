@@ -46,6 +46,7 @@ import {
   simulatorWorkloadRequestsQuery,
 } from '../../queries/resourceSimulator';
 import {
+  BYTES_PER_GIB,
   buildBaseline,
   calculateSimulatorResults,
   containerResourceTotals,
@@ -61,6 +62,7 @@ import {
   MetricSample,
   parseScenario,
   serializeScenario,
+  SIMULATOR_QUOTA_RESOURCE_KEYS,
   SimulatorResultRow,
   SimulatorRowStatus,
   SimulatorRowUnit,
@@ -230,6 +232,40 @@ export class ResourceSimulatorObject extends SceneObjectBase<ResourceSimulatorSt
 
   public resetScenario = () => {
     this.setState({ scenario: DEFAULT_SCENARIO_JSON });
+  };
+
+  public updateQuotaOverride = (resource: string, hard: number) => {
+    this.updateScenario((scenario) => ({
+      ...scenario,
+      quotaOverrides: {
+        ...scenario.quotaOverrides,
+        [resource]: hard,
+      },
+    }));
+  };
+
+  public updateQuotaOverrides = (overrides: Record<string, number>) => {
+    this.updateScenario((scenario) => ({
+      ...scenario,
+      quotaOverrides: {
+        ...scenario.quotaOverrides,
+        ...overrides,
+      },
+    }));
+  };
+
+  public resetQuotaOverride = (resource: string) => {
+    this.updateScenario((scenario) => ({
+      ...scenario,
+      quotaOverrides: Object.fromEntries(Object.entries(scenario.quotaOverrides).filter(([key]) => key !== resource)),
+    }));
+  };
+
+  public resetQuotaOverrides = () => {
+    this.updateScenario((scenario) => ({
+      ...scenario,
+      quotaOverrides: {},
+    }));
   };
 
   private updateScenario(updater: (scenario: WorkloadScenarioState) => WorkloadScenarioState) {
@@ -510,11 +546,132 @@ function ResourceSimulatorRenderer({ model }: SceneComponentProps<ResourceSimula
         )}
 
         <div className={styles.section}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} wrap="wrap">
+            <div>
+              <h3 className={styles.sectionTitle}>Namespace quota scenario</h3>
+              <p className={styles.sectionText}>
+                Simulated ResourceQuota hard limits for the selected namespace.
+              </p>
+            </div>
+            <Stack direction="row" gap={1} wrap="wrap">
+              <Button variant="secondary" icon="check" onClick={() => fitAllQuotaRows(model, results.rows)}>
+                Fit projected
+              </Button>
+              <Button variant="secondary" icon="sync" onClick={model.resetQuotaOverrides}>
+                Use live hard limits
+              </Button>
+            </Stack>
+          </Stack>
+          <QuotaScenarioTable model={model} rows={results.rows} />
+        </div>
+
+        <div className={styles.section}>
           <h3 className={styles.sectionTitle}>Projected Quota And Capacity</h3>
           <ResultTable rows={results.rows} />
         </div>
       </Stack>
     </div>
+  );
+}
+
+function QuotaScenarioTable({ model, rows }: { model: ResourceSimulatorObject; rows: SimulatorResultRow[] }) {
+  const styles = useStyles2(getStyles);
+  const quotaRows = quotaScenarioRows(rows);
+
+  return (
+    <div className={styles.tableWrap}>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th>Live used</th>
+            <th>Live hard</th>
+            <th>Sim hard</th>
+            <th>Projected</th>
+            <th>Remaining</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {quotaRows.map((row) => (
+            <tr key={row.key}>
+              <td>
+                <Stack direction="column" gap={0}>
+                  <Stack direction="row" alignItems="center" gap={1} wrap="wrap">
+                    <strong>{row.label}</strong>
+                    {row.hardEdited && <Badge color="blue" text="Edited" />}
+                  </Stack>
+                  <span className={styles.rowMeta}>{quotaResourceGroup(row.key)}</span>
+                </Stack>
+              </td>
+              <td>{formatValue(row.baseline, row.unit)}</td>
+              <td>{formatLiveHardValue(row)}</td>
+              <td>
+                <QuotaHardInput
+                  row={row}
+                  onChange={(value) => model.updateQuotaOverride(row.key, value)}
+                />
+              </td>
+              <td>{formatValue(row.projected, row.unit)}</td>
+              <td>{formatRemainingValue(row)}</td>
+              <td>
+                <StatusBadge status={row.status} />
+              </td>
+              <td>
+                <Stack direction="row" gap={1} wrap="wrap">
+                  <Button variant="secondary" size="sm" onClick={() => model.updateQuotaOverride(row.key, fitQuotaHard(row))}>
+                    Fit
+                  </Button>
+                  <Button variant="secondary" size="sm" disabled={!row.hardEdited} onClick={() => model.resetQuotaOverride(row.key)}>
+                    Reset
+                  </Button>
+                </Stack>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function QuotaHardInput({ row, onChange }: { row: SimulatorResultRow; onChange: (value: number) => void }) {
+  const value = row.hard ?? row.liveHard ?? 0;
+
+  if (row.unit === 'count') {
+    return (
+      <NumberInput
+        label={`Simulated hard limit for ${row.label}`}
+        value={Math.round(value)}
+        min={0}
+        step={1}
+        width={9}
+        onChange={onChange}
+      />
+    );
+  }
+
+  if (row.unit === 'bytes') {
+    return (
+      <QuantityInput
+        label={`Simulated hard limit for ${row.label}`}
+        value={value}
+        formatter={(bytes) => formatGiBQuantity(bytes / BYTES_PER_GIB)}
+        parser={parseByteQuantityToBytes}
+        onChange={onChange}
+      />
+    );
+  }
+
+  return (
+    <QuantityInput
+      label={`Simulated hard limit for ${row.label}`}
+      value={value}
+      formatter={formatCpuQuantity}
+      parser={parseCpuQuantityToCores}
+      onChange={onChange}
+    />
   );
 }
 
@@ -1409,6 +1566,47 @@ function summaryRows(rows: SimulatorResultRow[]) {
     .filter((row): row is SimulatorResultRow => Boolean(row));
 }
 
+function quotaScenarioRows(rows: SimulatorResultRow[]) {
+  return SIMULATOR_QUOTA_RESOURCE_KEYS.map((key) => rows.find((resultRow) => resultRow.key === key)).filter(
+    (row): row is SimulatorResultRow => Boolean(row)
+  );
+}
+
+function quotaResourceGroup(resource: string) {
+  if (resource.includes('cpu') || resource.includes('memory')) {
+    return 'Compute';
+  }
+
+  if (resource.includes('storage') || resource.includes('persistentvolumeclaims')) {
+    return 'Storage';
+  }
+
+  return 'Objects';
+}
+
+function fitAllQuotaRows(model: ResourceSimulatorObject, rows: SimulatorResultRow[]) {
+  model.updateQuotaOverrides(
+    Object.fromEntries(quotaScenarioRows(rows).map((row) => [row.key, fitQuotaHard(row)]))
+  );
+}
+
+function fitQuotaHard(row: SimulatorResultRow) {
+  if (row.unit === 'cores') {
+    return Math.ceil(row.projected * 10) / 10;
+  }
+
+  if (row.unit === 'bytes') {
+    return Math.ceil(row.projected / BYTES_PER_GIB) * BYTES_PER_GIB;
+  }
+
+  return Math.ceil(row.projected);
+}
+
+function parseByteQuantityToBytes(value: string) {
+  const gib = parseByteQuantityToGiB(value);
+  return gib === undefined ? undefined : gib * BYTES_PER_GIB;
+}
+
 function formatWorkloadType(type: WorkloadType) {
   return WORKLOAD_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type;
 }
@@ -1508,6 +1706,10 @@ function formatLimitValue(row: SimulatorResultRow) {
   }
 
   return row.status === 'unlimited' ? 'Unlimited' : 'Unknown';
+}
+
+function formatLiveHardValue(row: SimulatorResultRow) {
+  return row.liveHard === undefined ? 'Unlimited' : formatValue(row.liveHard, row.unit);
 }
 
 function formatRemainingValue(row: SimulatorResultRow) {
